@@ -3,6 +3,9 @@ import { GoogleAuthProvider } from './modules/auth/googleProvider.ts';
 import { SandboxAuthProvider } from './modules/auth/sandboxProvider.ts';
 import type { AuthProvider } from './modules/auth/types.ts';
 import { MockCashflowStore } from './modules/cashflow/mock/store.ts';
+import { createCopilotServices, type CopilotServices } from './modules/copilot/index.ts';
+import { NessieCashflowStore } from './modules/cashflow/nessie/nessieStore.ts';
+import type { CashflowStore } from './modules/cashflow/store.ts';
 import { BypassIdentityService } from './modules/identity/bypassIdentityService.ts';
 import { PersonaIdentityService } from './modules/identity/personaService.ts';
 import { SandboxIdentityService } from './modules/identity/sandboxIdentityService.ts';
@@ -31,7 +34,9 @@ export interface Services {
   identityBypassed: boolean;
   nessie: NessieApi;
   provisioner: Provisioner;
-  cashflow: MockCashflowStore;
+  cashflow: CashflowStore;
+  /** Cash Flow Copilot backend: Java ledger + Python intelligence, behind Express. */
+  copilot: CopilotServices;
 }
 
 export function createServices(config: AppConfig): Services {
@@ -53,6 +58,7 @@ export function createServices(config: AppConfig): Services {
 
   const nessie = createNessieApi(config);
   const provisioner = new Provisioner(nessie, users);
-  const cashflow = new MockCashflowStore();
-  return { config: effectiveConfig, users, auth, identity, identityBypassed: IDENTITY_BYPASS, nessie, provisioner, cashflow };
+  const cashflow: CashflowStore = config.cashflowSource === 'mock' ? new MockCashflowStore() : new NessieCashflowStore(nessie, users);
+  const copilot = createCopilotServices(effectiveConfig);
+  return { config: effectiveConfig, users, auth, identity, identityBypassed: IDENTITY_BYPASS, nessie, provisioner, cashflow, copilot };
 }

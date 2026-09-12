@@ -1,9 +1,10 @@
-import { Building2, CalendarDays, Landmark, LogOut, Plus, RefreshCw } from 'lucide-react';
-import type { CashAccount, CashflowCompany, PeriodOption, PublicUser } from '../../../../shared/types.ts';
+import { Building2, CalendarDays, Landmark, LogOut, Plus, RefreshCw, Sparkles } from 'lucide-react';
+import { Link } from 'react-router';
+import type { CashAccount, CashflowCompany, CashflowDashboard, PeriodOption, PublicUser } from '../../../../shared/types.ts';
 import { cn } from '../../lib/cn.ts';
 import { initials, relativeTime } from '../../lib/format.ts';
 import { Badge } from '../ui/Badge.tsx';
-import { Button } from '../ui/Button.tsx';
+import { Button, buttonClasses } from '../ui/Button.tsx';
 import { Logo } from '../ui/Logo.tsx';
 import { Dropdown } from './Dropdown.tsx';
 
@@ -21,6 +22,7 @@ interface TopBarProps {
   user: PublicUser | null;
   companies: CashflowCompany[];
   companyId: string;
+  dataSource: CashflowDashboard['dataSource'] | null;
   accounts: CashAccount[];
   accountIds: string[] | null;
   periods: PeriodOption[];
@@ -39,15 +41,25 @@ interface TopBarProps {
 }
 
 export function TopBar(props: TopBarProps) {
-  const { user, companies, companyId, accounts, accountIds, periods, period, lastSyncedAt, syncing, loading, activeSection } = props;
+  const { user, companies, companyId, dataSource, accounts, accountIds, periods, period, lastSyncedAt, syncing, loading, activeSection } = props;
+  const live = dataSource?.provider === 'nessie' && dataSource.mode === 'live';
   const accountOptions = accounts.map((a) => ({ id: a.id, label: a.name, description: `${a.institutionName}${a.mask ? ` · •••• ${a.mask}` : ''}` }));
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur supports-[backdrop-filter]:bg-panel/85">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-2 px-5 py-2.5 sm:px-8">
         <div className="flex items-center gap-3">
           <Logo />
-          <Badge tone="warning" title="Figures come from the mock cash-flow API, not a bank connection">
-            Sample data
+          <Badge
+            tone={live ? 'success' : 'warning'}
+            title={
+              dataSource?.provider === 'nessie'
+                ? live
+                  ? 'Figures come from your Nessie workspace through the live banking API'
+                  : 'Figures come from the in-memory Nessie sandbox (no NESSIE_API_KEY set)'
+                : 'Figures come from the generated sample ledger, not a bank connection'
+            }
+          >
+            {dataSource?.label ?? 'Loading…'}
           </Badge>
         </div>
 
@@ -82,6 +94,10 @@ export function TopBar(props: TopBarProps) {
             <span className="hidden sm:inline">Add transaction</span>
             <span className="sm:hidden">Add</span>
           </Button>
+          <Link to="/advisor" className={buttonClasses('secondary', 'sm')} title="Ask the cash-flow advisor">
+            <Sparkles className="size-4 text-brand-600" aria-hidden="true" />
+            <span className="hidden sm:inline">Advisor</span>
+          </Link>
           {user && (
             <button
               type="button"

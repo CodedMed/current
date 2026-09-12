@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { StepRoute } from './components/StepRoute.tsx';
 import { SessionProvider } from './lib/session.tsx';
+import AdvisorPage from './pages/AdvisorPage.tsx';
 import DashboardPage from './pages/DashboardPage.tsx';
 import SignUpPage from './pages/SignUpPage.tsx';
 import VerifyIdentityPage from './pages/VerifyIdentityPage.tsx';
@@ -57,6 +58,15 @@ export default function App() {
           element={
             <StepRoute step="dashboard">
               <DashboardPage />
+            </StepRoute>
+          }
+        />
+        {/* The advisor is part of the workspace: same gate as the dashboard. */}
+        <Route
+          path="/advisor"
+          element={
+            <StepRoute step="dashboard">
+              <AdvisorPage />
             </StepRoute>
           }
         />

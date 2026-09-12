@@ -1,0 +1,252 @@
+{
+  "_comment": [
+    "Demo business used when DEMO_MODE=true. Loaded once per demo user by DemoSeedService.",
+    "Everything that is NOT bank data (receivables, vendor invoices, tax obligation, tasks)",
+    "lives here; bank accounts, past transactions and future bills come from nessie_mock.json.",
+    "Day offsets are relative to 'today' so the forecast always has a live horizon.",
+    "",
+    "Scenario targets from the specification:",
+    "  available cash 8,000 | receivables 25,000 | vendor payments due 6,000",
+    "  monthly operating cost 3,000 | upcoming tax obligation | first projected gap inside 60 days"
+  ],
+  "receivables": [
+    {
+      "sourceRecordId": "rcv-client-a",
+      "counterpartyLabel": "Client A",
+      "amount": 4000.00,
+      "dueDayOffset": -12,
+      "status": "OVERDUE",
+      "description": "Invoice 1041 - brand system delivery"
+    },
+    {
+      "sourceRecordId": "rcv-client-d",
+      "counterpartyLabel": "Client D",
+      "amount": 2500.00,
+      "dueDayOffset": 19,
+      "status": "EXPECTED",
+      "description": "Invoice 1052 - monthly retainer"
+    },
+    {
+      "sourceRecordId": "rcv-client-b",
+      "counterpartyLabel": "Client B",
+      "amount": 9000.00,
+      "dueDayOffset": 38,
+      "status": "EXPECTED",
+      "description": "Invoice 1048 - platform migration milestone"
+    },
+    {
+      "sourceRecordId": "rcv-client-c",
+      "counterpartyLabel": "Client C",
+      "amount": 9500.00,
+      "dueDayOffset": 41,
+      "status": "EXPECTED",
+      "description": "Invoice 1050 - analytics engagement"
+    }
+  ],
+  "obligations": [
+    {
+      "sourceRecordId": "tax-quarterly-estimate",
+      "description": "Quarterly estimated tax payment",
+      "category": "tax",
+      "amount": 4500.00,
+      "dueDayOffset": 27
+    }
+  ],
+  "vendorInvoices": [
+    {
+      "sourceRecordId": "inv-cloud-provider-m10",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 960.00,
+      "previousAmount": 960.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -298,
+      "dueDayOffset": -284,
+      "paidDayOffset": -284,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m9",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 975.00,
+      "previousAmount": 960.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -268,
+      "dueDayOffset": -254,
+      "paidDayOffset": -254,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m8",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 970.00,
+      "previousAmount": 975.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -238,
+      "dueDayOffset": -224,
+      "paidDayOffset": -224,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m7",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 990.00,
+      "previousAmount": 970.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -208,
+      "dueDayOffset": -194,
+      "paidDayOffset": -194,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m6",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 985.00,
+      "previousAmount": 990.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -178,
+      "dueDayOffset": -164,
+      "paidDayOffset": -164,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m5",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 1005.00,
+      "previousAmount": 985.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -148,
+      "dueDayOffset": -134,
+      "paidDayOffset": -134,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m4",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 1000.00,
+      "previousAmount": 1005.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -118,
+      "dueDayOffset": -104,
+      "paidDayOffset": -104,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m3",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 980.00,
+      "previousAmount": 1000.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -88,
+      "dueDayOffset": -74,
+      "paidDayOffset": -74,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m2",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 1015.00,
+      "previousAmount": 980.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -58,
+      "dueDayOffset": -44,
+      "paidDayOffset": -44,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-m1",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 995.00,
+      "previousAmount": 1015.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -28,
+      "dueDayOffset": -14,
+      "paidDayOffset": -14,
+      "status": "PAID",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": false
+    },
+    {
+      "sourceRecordId": "inv-cloud-provider-current",
+      "vendorKey": "cloud_provider",
+      "vendorDisplayName": "Cloud Provider",
+      "amount": 1000.00,
+      "previousAmount": 995.00,
+      "category": "cloud_services",
+      "invoiceDayOffset": -3,
+      "dueDayOffset": 5,
+      "status": "OPEN",
+      "recurring": true,
+      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "createsCashEvent": true
+    },
+    {
+      "sourceRecordId": "inv-contractor-current",
+      "vendorKey": "design_contractor",
+      "vendorDisplayName": "Northside Design Studio",
+      "amount": 2500.00,
+      "category": "contractor",
+      "invoiceDayOffset": -1,
+      "dueDayOffset": 11,
+      "status": "OPEN",
+      "recurring": false,
+      "paymentDestinationFingerprint": "sha256:4b8e2d6f0a2c4e6a8c0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c",
+      "createsCashEvent": true
+    }
+  ],
+  "todos": [
+    {
+      "title": "Send payment reminder to Client A",
+      "description": "Invoice 1041 for $4,000 is past due.",
+      "source": "MANUAL",
+      "status": "IN_PROGRESS",
+      "priority": "HIGH",
+      "dueDayOffset": 1
+    },
+    {
+      "title": "Set aside cash for quarterly tax payment",
+      "description": "Estimated tax of $4,500 is due within the forecast horizon.",
+      "source": "FORECAST",
+      "status": "PROPOSED",
+      "priority": "MEDIUM",
+      "dueDayOffset": 20
+    }
+  ]
+}

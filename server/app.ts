@@ -8,12 +8,13 @@ import { createAuthRouter } from './modules/auth/routes.ts';
 // Nessie-backed dashboard, parked while the dashboard runs on mock data.
 // import { createDashboardRouter } from './modules/cashflow/routes.ts';
 import { createCashflowRouter } from './modules/cashflow/mock/routes.ts';
+import { createCopilotRouter } from './modules/copilot/index.ts';
 import { createIdentityRouter, createIdentityWebhookRouter } from './modules/identity/routes.ts';
 import { createOnboardingRouter } from './modules/onboarding/routes.ts';
 import type { Services } from './services.ts';
 
 export function createApp(services: Services): express.Express {
-  const { config, users, auth, identity, provisioner, cashflow } = services;
+  const { config, users, auth, identity, provisioner, cashflow, copilot } = services;
   const app = express();
 
   app.disable('x-powered-by');
@@ -45,6 +46,8 @@ export function createApp(services: Services): express.Express {
   app.use('/api/onboarding', createOnboardingRouter({ config, users, provisioner }));
   // app.use('/api/dashboard', createDashboardRouter({ config, nessie: services.nessie }));
   app.use('/api/cashflow', createCashflowRouter({ config, store: cashflow }));
+  // Cash Flow Copilot backend (documents, invoice risk, deterministic forecast, advisor, voice, tasks).
+  app.use('/api/copilot', createCopilotRouter({ config, ...copilot }));
   app.use('/api', notFoundHandler);
 
   if (config.isProduction) {

@@ -22,7 +22,6 @@ import { ApiError, api } from '../lib/api.ts';
 import { cn } from '../lib/cn.ts';
 import { useSession } from '../lib/session.tsx';
 
-const DEFAULT_COMPANY = 'acme';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -34,7 +33,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const user = session?.user ?? null;
 
-  const [companyId, setCompanyId] = useState(DEFAULT_COMPANY);
+  const [companyId, setCompanyId] = useState('');
   const [accountIds, setAccountIds] = useState<string[] | null>(null);
   const [period, setPeriod] = useState('last30');
   const [horizon, setHorizon] = useState<ForecastHorizon>(90);
@@ -74,7 +73,24 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // The company list comes from the API: with Nessie it is the user's provisioned workspace.
   useEffect(() => {
+    let cancelled = false;
+    api.cashflow
+      .companies()
+      .then((r) => {
+        if (!cancelled) setCompanyId((current) => current || r.companies[0]?.id || '');
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err : new ApiError(0, 'unknown', 'Could not load your companies.'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!filters.companyId) return;
     void load(filters);
   }, [filters, load, version]);
 
@@ -184,6 +200,7 @@ export default function DashboardPage() {
         user={user}
         companies={data?.companies ?? [{ id: companyId, name: 'Loading…', legalName: '' }]}
         companyId={companyId}
+        dataSource={data?.dataSource ?? null}
         accounts={data?.accounts ?? []}
         accountIds={accountIds}
         periods={data?.periods ?? []}

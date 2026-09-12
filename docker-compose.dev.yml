@@ -1,0 +1,63 @@
+# Local development stack for the Cash Flow Copilot backend: a Tiger Data / TimescaleDB database
+# plus the two backend services. The Keel web app (Express API + Vite client) runs on the host
+# with `npm run dev`, and Ollama is expected on the host too, which is the simplest Mac setup.
+#
+#   cp .env.example .env
+#   docker compose -f docker-compose.dev.yml up --build
+#   npm run dev                       # then open http://localhost:5173
+#
+# Point the host app at the containers with the defaults already in .env.example
+# (LEDGER_SERVICE_URL=http://localhost:8080, INTELLIGENCE_SERVICE_URL=http://localhost:8000).
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: copilot
+      POSTGRES_DB: copilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - copilot-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot -d copilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  ledger-service:
+    build:
+      context: .
+      dockerfile: services/ledger-service/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-true}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-dev-internal-token}
+      DATABASE_URL: postgresql://copilot:copilot@db:5432/copilot
+      NESSIE_BASE_URL: ${NESSIE_BASE_URL:-https://api.nessieisreal.com}
+      NESSIE_API_KEY: ${NESSIE_API_KEY:-}
+    ports:
+      - "8080:8080"
+
+  intelligence-service:
+    build:
+      context: services/intelligence-service
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-true}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-dev-internal-token}
+      LEDGER_SERVICE_URL: http://ledger-service:8080
+      # Ollama runs on the host; containers reach it through host.docker.internal.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_AGENT_ID: ${ELEVENLABS_AGENT_ID:-}
+    ports:
+      - "8000:8000"
+
+volumes:
+  copilot-db:

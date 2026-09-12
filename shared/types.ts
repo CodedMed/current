@@ -545,7 +545,7 @@ export interface CashflowDashboard {
   reviews: ReviewQueue;
   recentTransactions: CashTransaction[];
   lastSyncedAt: string;
-  dataSource: { provider: 'mock'; label: string };
+  dataSource: { provider: 'mock' | 'nessie'; mode: 'live' | 'sandbox'; label: string };
 }
 
 export interface TransactionListResponse {

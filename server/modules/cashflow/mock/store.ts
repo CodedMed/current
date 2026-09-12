@@ -12,30 +12,35 @@ import type {
   UpdateTransactionInput,
 } from '../../../../shared/types.ts';
 import { isoDate, startOfToday } from '../../../lib/dates.ts';
-import { badRequest, notFound } from '../../../lib/errors.ts';
+import { notFound } from '../../../lib/errors.ts';
+import type { CashflowStore } from '../store.ts';
 import { buildDashboard } from './analytics.ts';
 import { generateLedger, type Ledger } from './ledger.ts';
+import {
+  buildManualTransaction,
+  findLedgerTransaction,
+  insertLedgerTransaction,
+  listLedgerTransactions,
+  patchLedgerTransaction,
+  validateNewTransaction,
+  type ListOptions,
+} from './ledgerOps.ts';
 import { applyForLoan, buildLoanOffers, toggleSavedOffer } from './lending.ts';
-import { CATEGORY_NAME, PROFILES, findProfile } from './profiles.ts';
+import { PROFILES, findProfile } from './profiles.ts';
 import { assessReviews, decideReview } from './review.ts';
 
-export interface ListOptions {
-  accountIds: string[] | null;
-  limit: number;
-  offset: number;
-  query: string | null;
-  scope: 'activity' | 'scheduled' | 'all';
-}
+export type { ListOptions } from './ledgerOps.ts';
 
 /**
  * In-memory home for the mock ledgers. Each signed-in user gets their own copy
  * per company, so edits made while exploring never leak between sessions.
  * Ledgers are regenerated when the calendar day changes.
  */
-export class MockCashflowStore {
+export class MockCashflowStore implements CashflowStore {
+  readonly source = 'mock' as const;
   readonly #ledgers = new Map<string, Ledger>();
 
-  companies(): CashflowCompany[] {
+  companies(_userId?: string): CashflowCompany[] {
     return PROFILES.map((p) => ({ id: p.id, name: p.name, legalName: p.legalName }));
   }
 
@@ -57,83 +62,25 @@ export class MockCashflowStore {
   }
 
   listTransactions(userId: string, companyId: string, options: ListOptions): TransactionListResponse {
-    const ledger = this.ledger(userId, companyId);
-    const wanted = options.accountIds ? new Set(options.accountIds) : null;
-    const q = options.query?.trim().toLowerCase() ?? '';
-    const matches = ledger.transactions.filter((t) => {
-      if (wanted && !wanted.has(t.accountId)) return false;
-      if (options.scope === 'activity' && t.status === 'SCHEDULED') return false;
-      if (options.scope === 'scheduled' && t.status !== 'SCHEDULED') return false;
-      if (q && !`${t.merchant} ${t.description} ${CATEGORY_NAME[t.categoryId] ?? ''}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-    const ordered = options.scope === 'scheduled' ? matches : [...matches].reverse();
-    return { items: ordered.slice(options.offset, options.offset + options.limit), total: ordered.length };
+    return listLedgerTransactions(this.ledger(userId, companyId), options);
   }
 
   getTransaction(userId: string, companyId: string, id: string): CashTransaction {
-    const t = this.ledger(userId, companyId).transactions.find((x) => x.id === id);
-    if (!t) throw notFound('No such transaction.');
-    return t;
+    return findLedgerTransaction(this.ledger(userId, companyId), id);
   }
 
   addTransaction(userId: string, companyId: string, input: NewTransactionInput): CashTransaction {
     const ledger = this.ledger(userId, companyId);
-    const account = ledger.accounts.find((a) => a.id === input.accountId);
-    if (!account) throw badRequest('Choose one of the connected accounts.');
-    if (!ledger.categories.some((c) => c.id === input.categoryId)) throw badRequest('Choose a listed category.');
-    const isFuture = input.date > ledger.today;
-    if (input.status === 'POSTED' && isFuture) throw badRequest('A posted transaction cannot be dated in the future. Save it as scheduled instead.');
-    if (input.status === 'SCHEDULED' && !isFuture) throw badRequest('A scheduled transaction needs a future date.');
-
+    const account = validateNewTransaction(ledger, input);
     const id = `txn_${companyId}_m${String(ledger.nextId).padStart(4, '0')}`;
     ledger.nextId += 1;
-    const amount = Math.round(input.amount * 100) / 100;
-    const txn: CashTransaction = {
-      id,
-      accountId: input.accountId,
-      date: input.date,
-      postedDate: input.status === 'POSTED' ? input.date : null,
-      amount,
-      direction: input.direction,
-      status: input.status,
-      paymentMethod: input.paymentMethod,
-      merchant: input.merchant,
-      description: input.description?.trim() || (input.direction === 'INFLOW' ? 'Manual deposit' : 'Manual payment'),
-      categoryId: input.categoryId,
-      source: 'MANUAL',
-      counterpartyId: null,
-      note: null,
-      forecast: input.status === 'SCHEDULED' ? { confidence: 1, source: 'MANUAL' } : null,
-      review: null,
-    };
-    if (txn.status === 'POSTED') {
-      const sign = txn.direction === 'INFLOW' ? 1 : -1;
-      account.bookBalance = Math.round((account.bookBalance + sign * amount) * 100) / 100;
-      account.availableBalance = Math.round((account.availableBalance + sign * amount) * 100) / 100;
-    }
-    const index = ledger.transactions.findIndex((t) => t.date > txn.date);
-    if (index === -1) ledger.transactions.push(txn);
-    else ledger.transactions.splice(index, 0, txn);
-    assessReviews(ledger);
+    const txn = buildManualTransaction(id, input);
+    insertLedgerTransaction(ledger, account, txn);
     return txn;
   }
 
   updateTransaction(userId: string, companyId: string, id: string, patch: UpdateTransactionInput): CashTransaction {
-    const ledger = this.ledger(userId, companyId);
-    const txn = ledger.transactions.find((t) => t.id === id);
-    if (!txn) throw notFound('No such transaction.');
-    if (patch.categoryId !== undefined) {
-      if (!ledger.categories.some((c) => c.id === patch.categoryId)) throw badRequest('Choose a listed category.');
-      txn.categoryId = patch.categoryId;
-    }
-    if (patch.note !== undefined) txn.note = patch.note?.trim() ? patch.note.trim() : null;
-    if (patch.description !== undefined && patch.description.trim()) txn.description = patch.description.trim();
-    if (patch.merchant !== undefined && patch.merchant.trim()) {
-      txn.merchant = patch.merchant.trim();
-      assessReviews(ledger);
-    }
-    return txn;
+    return patchLedgerTransaction(this.ledger(userId, companyId), id, patch);
   }
 
   decideReview(userId: string, companyId: string, id: string, decision: ReviewDecision, note: string | null): CashTransaction {

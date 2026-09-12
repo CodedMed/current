@@ -1,14 +1,23 @@
 {
   "name": "cashflow-onboarding",
   "version": "1.0.0",
-  "description": "Keel — sign-up, identity verification, and onboarding flow for small-business cash-flow management",
+  "description": "Keel \u2014 sign-up, identity verification, onboarding, and the Cash Flow Copilot backend (ledger, documents, invoice risk, advisor) for small-business cash-flow management",
   "scripts": {
     "dev": "concurrently -k -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "node --watch --env-file-if-exists=.env server/index.ts",
     "dev:client": "vite",
+    "dev:ledger": "cd services/ledger-service && node ../../scripts/with-env.mjs ./mvnw -q spring-boot:run",
+    "dev:intelligence": "cd services/intelligence-service && node ../../scripts/with-env.mjs .venv/bin/uvicorn app.main:app --reload --port 8000",
+    "dev:services": "concurrently -k -n ledger,intel -c yellow,green \"npm:dev:ledger\" \"npm:dev:intelligence\"",
+    "dev:all": "concurrently -k -n server,client,ledger,intel -c blue,magenta,yellow,green \"npm:dev:server\" \"npm:dev:client\" \"npm:dev:ledger\" \"npm:dev:intelligence\"",
+    "setup:intelligence": "cd services/intelligence-service && python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e '.[documents,ml,ai,dev]'",
     "build": "vite build",
     "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.ts",
-    "typecheck": "tsc -p tsconfig.server.json && tsc -p tsconfig.client.json"
+    "typecheck": "tsc -p tsconfig.server.json && tsc -p tsconfig.client.json",
+    "test": "node --test \"server/**/*.test.ts\" \"client/src/**/*.test.ts\" \"shared/**/*.test.ts\"",
+    "test:ledger": "cd services/ledger-service && node ../../scripts/with-env.mjs ./mvnw -q test",
+    "test:intelligence": "cd services/intelligence-service && .venv/bin/pytest -q",
+    "test:all": "npm test && npm run test:intelligence && npm run test:ledger"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +25,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@elevenlabs/client": "^1.25.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "google-auth-library": "^11.0.2",

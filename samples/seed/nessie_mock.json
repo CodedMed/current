@@ -1,0 +1,168 @@
+{
+  "_comment": [
+    "Fixture data served by MockNessieClient when NESSIE_API_KEY is absent or DEMO_MODE=true.",
+    "Dates are expressed as offsets in days from 'today' so the demo never goes stale.",
+    "Field names mirror the shape of the Capital One Nessie REST API; RealNessieClient maps",
+    "the live payloads onto the same DTOs."
+  ],
+  "customerId": "demo-customer-001",
+  "accounts": [
+    {
+      "id": "acc-checking-001",
+      "type": "Checking",
+      "nickname": "Operating Checking",
+      "balance": 8000.00
+    }
+  ],
+  "deposits": [
+    {
+      "id": "dep-001",
+      "accountId": "acc-checking-001",
+      "dayOffset": -20,
+      "amount": 6000.00,
+      "status": "completed",
+      "description": "Client payment - Project Orion"
+    },
+    {
+      "id": "dep-002",
+      "accountId": "acc-checking-001",
+      "dayOffset": -8,
+      "amount": 3200.00,
+      "status": "completed",
+      "description": "Client payment - monthly retainer"
+    }
+  ],
+  "purchases": [
+    {
+      "id": "pur-001",
+      "accountId": "acc-checking-001",
+      "dayOffset": -28,
+      "amount": 2200.00,
+      "status": "completed",
+      "description": "Office rent",
+      "category": "rent"
+    },
+    {
+      "id": "pur-002",
+      "accountId": "acc-checking-001",
+      "dayOffset": -26,
+      "amount": 1000.00,
+      "status": "completed",
+      "description": "Cloud Provider monthly bill",
+      "category": "cloud_services"
+    },
+    {
+      "id": "pur-003",
+      "accountId": "acc-checking-001",
+      "dayOffset": -22,
+      "amount": 780.00,
+      "status": "completed",
+      "description": "Utilities",
+      "category": "utilities"
+    },
+    {
+      "id": "pur-004",
+      "accountId": "acc-checking-001",
+      "dayOffset": -18,
+      "amount": 3200.00,
+      "status": "completed",
+      "description": "Contractor payment",
+      "category": "contractor"
+    },
+    {
+      "id": "pur-005",
+      "accountId": "acc-checking-001",
+      "dayOffset": -14,
+      "amount": 450.00,
+      "status": "completed",
+      "description": "Software subscriptions",
+      "category": "software"
+    },
+    {
+      "id": "pur-006",
+      "accountId": "acc-checking-001",
+      "dayOffset": -9,
+      "amount": 1200.00,
+      "status": "completed",
+      "description": "Equipment and supplies",
+      "category": "supplies"
+    },
+    {
+      "id": "pur-007",
+      "accountId": "acc-checking-001",
+      "dayOffset": -4,
+      "amount": 620.00,
+      "status": "completed",
+      "description": "Client travel",
+      "category": "travel"
+    }
+  ],
+  "bills": [
+    {
+      "id": "bill-rent-current",
+      "accountId": "acc-checking-001",
+      "payee": "Harbor Property Group",
+      "nickname": "Office rent",
+      "dayOffset": 2,
+      "amount": 2200.00,
+      "status": "pending",
+      "recurring": true,
+      "category": "rent"
+    },
+    {
+      "id": "bill-utilities-current",
+      "accountId": "acc-checking-001",
+      "payee": "Metro Utilities",
+      "nickname": "Utilities",
+      "dayOffset": 6,
+      "amount": 800.00,
+      "status": "pending",
+      "recurring": true,
+      "category": "utilities"
+    },
+    {
+      "id": "bill-insurance",
+      "accountId": "acc-checking-001",
+      "payee": "Northline Insurance",
+      "nickname": "Business liability insurance",
+      "dayOffset": 17,
+      "amount": 1000.00,
+      "status": "pending",
+      "recurring": true,
+      "category": "insurance"
+    },
+    {
+      "id": "bill-software",
+      "accountId": "acc-checking-001",
+      "payee": "Toolchain Inc",
+      "nickname": "Software subscriptions",
+      "dayOffset": 23,
+      "amount": 1500.00,
+      "status": "pending",
+      "recurring": true,
+      "category": "software"
+    },
+    {
+      "id": "bill-rent-next",
+      "accountId": "acc-checking-001",
+      "payee": "Harbor Property Group",
+      "nickname": "Office rent",
+      "dayOffset": 32,
+      "amount": 2200.00,
+      "status": "pending",
+      "recurring": true,
+      "category": "rent"
+    },
+    {
+      "id": "bill-utilities-next",
+      "accountId": "acc-checking-001",
+      "payee": "Metro Utilities",
+      "nickname": "Utilities",
+      "dayOffset": 36,
+      "amount": 800.00,
+      "status": "pending",
+      "recurring": true,
+      "category": "utilities"
+    }
+  ]
+}

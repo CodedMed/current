@@ -2,6 +2,7 @@ import type {
   ApiErrorBody,
   BusinessTypeId,
   CashTransaction,
+  CashflowCompany,
   CashflowDashboard,
   CashflowFilters,
   DashboardResponse,
@@ -20,6 +21,28 @@ import type {
   SandboxIdentityOutcome,
   SessionResponse,
 } from '../../../shared/types.ts';
+import type {
+  AccountsSummary,
+  AdvisorLanguage,
+  AdvisorReply,
+  AdvisorTurn,
+  CashEvent,
+  CashFlowForecast,
+  CopilotDashboard,
+  CopilotHealth,
+  CopilotInvoice,
+  CopilotMe,
+  CopilotTodo,
+  CreateTodoInput,
+  DocumentUploadEvent,
+  DocumentUploadStage,
+  InvoiceRiskResult,
+  ManualCashEventInput,
+  NessieSyncResult,
+  SavedDocumentResult,
+  UpdateTodoInput,
+  VoiceSession,
+} from '../../../shared/copilot.ts';
 
 export interface TransactionListParams {
   companyId: string;
@@ -102,6 +125,54 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return json as T;
 }
 
+/**
+ * Uploads a document to the copilot backend and reports each stage as the
+ * server reaches it (extracting locally → validating → scoring → saved).
+ * Resolves once the invoice is in the ledger; rejects with an ApiError otherwise.
+ */
+export async function uploadCopilotDocument(file: File, onStage?: (stage: DocumentUploadStage) => void): Promise<SavedDocumentResult> {
+  const form = new FormData();
+  form.append('file', file);
+  onStage?.('uploading');
+  let res: Response;
+  try {
+    res = await fetch('/api/copilot/documents', { method: 'POST', body: form, headers: { Accept: 'application/x-ndjson' }, credentials: 'same-origin' });
+  } catch {
+    throw new ApiError(0, 'network', 'We could not reach Keel. Check your connection and try again.');
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
+    throw new ApiError(res.status, body?.error?.code ?? 'http_error', body?.error?.message ?? `Upload failed (${res.status}).`, body?.error?.details);
+  }
+  if (!res.body) throw new ApiError(0, 'network', 'Upload status is unavailable.');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      pending += decoder.decode(value, { stream: !done });
+      let newline: number;
+      while ((newline = pending.indexOf('\n')) !== -1) {
+        const event = JSON.parse(pending.slice(0, newline)) as DocumentUploadEvent;
+        pending = pending.slice(newline + 1);
+        if (event.stage === 'error') throw new ApiError(422, event.error.code, event.error.message);
+        if (event.stage === 'saved') {
+          onStage?.('saved');
+          return event.result;
+        }
+        onStage?.(event.stage);
+      }
+      if (done) break;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  throw new ApiError(0, 'interrupted', 'The connection was interrupted. Check your invoices before uploading again.');
+}
+
 /* Typed endpoints — the only place the client knows URL shapes. */
 export const api = {
   session: (signal?: AbortSignal) => request<SessionResponse>('/api/session', { signal }),
@@ -128,6 +199,7 @@ export const api = {
   dashboard: (refresh = false) => request<DashboardResponse>(`/api/dashboard${refresh ? '?refresh=1' : ''}`),
 
   cashflow: {
+    companies: () => request<{ companies: CashflowCompany[] }>('/api/cashflow/companies'),
     dashboard: (filters: CashflowFilters, signal?: AbortSignal) =>
       request<CashflowDashboard>(
         `/api/cashflow/dashboard${toQuery({
@@ -166,6 +238,46 @@ export const api = {
       apply: (companyId: string, offerId: string, amount: number) =>
         request<LoanOffer>(`/api/cashflow/loan-offers/${encodeURIComponent(offerId)}/apply`, { method: 'POST', body: { companyId, amount } }),
       save: (companyId: string, offerId: string) => request<LoanOffer>(`/api/cashflow/loan-offers/${encodeURIComponent(offerId)}/save`, { method: 'POST', body: { companyId } }),
+    },
+  },
+
+  /**
+   * Cash Flow Copilot backend (Java ledger + Python intelligence) behind the
+   * Express BFF. Every call requires a verified identity; the browser never
+   * talks to the services directly.
+   */
+  copilot: {
+    health: () => request<CopilotHealth>('/api/copilot/health'),
+    me: () => request<CopilotMe>('/api/copilot/me'),
+
+    dashboard: (horizonDays?: number, signal?: AbortSignal) => request<CopilotDashboard>(`/api/copilot/dashboard${toQuery({ horizonDays })}`, { signal }),
+    forecast: (horizonDays?: number, signal?: AbortSignal) => request<CashFlowForecast>(`/api/copilot/forecast${toQuery({ horizonDays })}`, { signal }),
+    syncNessie: () => request<NessieSyncResult>('/api/copilot/nessie/sync', { method: 'POST' }),
+    accountsSummary: () => request<AccountsSummary>('/api/copilot/accounts/summary'),
+    cashEvents: (from?: string, to?: string) => request<CashEvent[]>(`/api/copilot/cash-events${toQuery({ from, to })}`),
+    addManualCashEvent: (input: ManualCashEventInput) => request<CashEvent>('/api/copilot/cash-events/manual', { method: 'POST', body: input }),
+
+    invoices: (signal?: AbortSignal) => request<CopilotInvoice[]>('/api/copilot/invoices', { signal }),
+    invoice: (id: string) => request<CopilotInvoice>(`/api/copilot/invoices/${encodeURIComponent(id)}`),
+    /** Scores the invoice against its vendor history and stores the result. */
+    scoreInvoice: (id: string) => request<InvoiceRiskResult>(`/api/copilot/invoices/${encodeURIComponent(id)}/risk`, { method: 'POST' }),
+    uploadDocument: uploadCopilotDocument,
+
+    /** Text advisor. The financial context is fetched server-side; only the question and prior turns travel. */
+    ask: (message: string, language: AdvisorLanguage = 'en', history: AdvisorTurn[] = [], signal?: AbortSignal) =>
+      request<AdvisorReply>('/api/copilot/advisor', { method: 'POST', body: { message, language, history }, signal }),
+    voice: {
+      session: (language: AdvisorLanguage = 'en') => request<VoiceSession>('/api/copilot/voice/session', { method: 'POST', body: { language } }),
+      /** A spoken turn: called from the ElevenLabs client tool; runs the same advisor pipeline. */
+      message: (message: string, language: AdvisorLanguage = 'en', history: AdvisorTurn[] = []) =>
+        request<AdvisorReply>('/api/copilot/voice/message', { method: 'POST', body: { message, language, history } }),
+    },
+
+    todos: {
+      list: (signal?: AbortSignal) => request<CopilotTodo[]>('/api/copilot/todos', { signal }),
+      create: (input: CreateTodoInput) => request<CopilotTodo>('/api/copilot/todos', { method: 'POST', body: input }),
+      update: (id: string, patch: UpdateTodoInput) => request<CopilotTodo>(`/api/copilot/todos/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
+      remove: (id: string) => request<{ deleted: true }>(`/api/copilot/todos/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     },
   },
 };

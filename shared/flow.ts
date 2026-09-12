@@ -35,8 +35,7 @@ export function pathForStep(step: FlowStep): string {
 export const PROGRESS_STEPS: ReadonlyArray<{ step: FlowStep; label: string; hint: string }> = [
   { step: 'signup', label: 'Create account', hint: 'Sign in with a provider' },
   { step: 'verify', label: 'Verify identity', hint: 'KYC / AML check' },
-  // Parked for now: verified users go straight to the dashboard (see server/flow.ts).
-  // { step: 'business-type', label: 'Business profile', hint: 'What you operate' },
-  // { step: 'features', label: 'Priorities', hint: 'What you need to manage' },
-  // { step: 'setup', label: 'Workspace', hint: 'Connect financial data' },
+  { step: 'business-type', label: 'Business profile', hint: 'What you operate' },
+  { step: 'features', label: 'Priorities', hint: 'What you need to manage' },
+  { step: 'setup', label: 'Workspace', hint: 'Connect financial data' },
 ];
