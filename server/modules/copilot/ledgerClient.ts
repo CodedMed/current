@@ -36,6 +36,8 @@ export interface DemoSeedResult {
 
 /** Ledger-side invoice shape: the browser shape plus the fingerprint the risk engine needs. */
 export interface LedgerInvoice extends CopilotInvoice {
+  /** Both hashes are needed server-side for risk scoring only; the browser never sees them. */
+  invoiceNumberHash: string | null;
   paymentDestinationFingerprint: string | null;
 }
 

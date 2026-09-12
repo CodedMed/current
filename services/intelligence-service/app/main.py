@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.api import advisor, documents, risk, voice
 from app.config import get_settings
 from app.errors import ApiError, api_error_handler
+from app.risk.isolation_forest import ml_available
 from app.voice.service import VOICE_CLIENT_TOOL
 
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,7 @@ def health() -> dict:
             "localExtractor": "ollama" if settings.ollama_enabled else "mock",
             "advisor": "gemini" if settings.gemini_enabled else "mock",
             "voice": "elevenlabs" if settings.elevenlabs_enabled else "text-fallback",
+            "riskModel": "rules+isolation-forest" if ml_available() else "rules-only",
         },
         "voiceClientTool": VOICE_CLIENT_TOOL,
     }

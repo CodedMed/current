@@ -120,6 +120,7 @@ public class InvoiceController {
             String status,
             boolean recurring,
             String source,
+            String invoiceNumberHash,
             /** Non-reversible hash of the payment destination; feeds the risk engine's history. */
             String paymentDestinationFingerprint,
             Double riskScore,
@@ -139,6 +140,7 @@ public class InvoiceController {
                     invoice.status(),
                     invoice.recurring(),
                     invoice.source(),
+                    invoice.invoiceNumberHash(),
                     invoice.paymentDestinationFingerprint(),
                     risk == null ? null : risk.riskScore(),
                     risk == null ? null : risk.severity(),

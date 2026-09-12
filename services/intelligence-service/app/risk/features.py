@@ -89,6 +89,7 @@ def _as_invoice_under_review(
         amount=historical.amount,
         invoice_date=historical.invoice_date,
         due_date=historical.paid_date,
+        invoice_number_hash=historical.invoice_number_hash,
         payment_destination_fingerprint=historical.payment_destination_fingerprint,
     )
 
@@ -125,11 +126,32 @@ def _price_change_pct(amount: float, previous: HistoricalInvoice | None) -> floa
     return (amount - previous_amount) / previous_amount
 
 
-def _is_duplicate(invoice: InvoiceUnderReview, ordered: list[HistoricalInvoice]) -> bool:
-    return any(
+def duplicate_kind(
+    invoice: InvoiceUnderReview, history: list[HistoricalInvoice]
+) -> str | None:
+    """``"number"`` when the invoice reference was seen before, ``"amount_and_date"`` when only the
+    amount and date coincide, ``None`` otherwise.
+
+    The reference is the stronger signal in both directions: a re-issued invoice with a corrected
+    amount is still the same invoice, and two invoices that both carry numbers which differ are
+    different documents even if they happen to share a day and a total. The amount-and-date proxy
+    therefore only compares against history that carries no number of its own."""
+    if invoice.invoice_number_hash:
+        if any(item.invoice_number_hash == invoice.invoice_number_hash for item in history):
+            return "number"
+        comparable = [item for item in history if not item.invoice_number_hash]
+    else:
+        comparable = history
+    if any(
         item.amount == invoice.amount and item.invoice_date == invoice.invoice_date
-        for item in ordered
-    )
+        for item in comparable
+    ):
+        return "amount_and_date"
+    return None
+
+
+def _is_duplicate(invoice: InvoiceUnderReview, ordered: list[HistoricalInvoice]) -> bool:
+    return duplicate_kind(invoice, ordered) is not None
 
 
 def _destination_changed(

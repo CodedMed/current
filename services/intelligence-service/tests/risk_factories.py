@@ -24,6 +24,7 @@ def invoice(
     days_ago: int = 0,
     destination: str | None = KNOWN_DESTINATION,
     due_in_days: int = PAYMENT_TERM_DAYS,
+    number_hash: str | None = None,
 ) -> InvoiceUnderReview:
     invoice_date = TODAY - timedelta(days=days_ago)
     return InvoiceUnderReview(
@@ -32,6 +33,7 @@ def invoice(
         amount=Decimal(amount),
         invoice_date=invoice_date,
         due_date=invoice_date + timedelta(days=due_in_days),
+        invoice_number_hash=number_hash,
         payment_destination_fingerprint=destination,
     )
 
@@ -41,12 +43,14 @@ def historical(
     *,
     days_ago: int,
     destination: str | None = KNOWN_DESTINATION,
+    number_hash: str | None = None,
 ) -> HistoricalInvoice:
     invoice_date = TODAY - timedelta(days=days_ago)
     return HistoricalInvoice(
         amount=Decimal(amount),
         invoice_date=invoice_date,
         paid_date=invoice_date + timedelta(days=PAYMENT_TERM_DAYS),
+        invoice_number_hash=number_hash,
         payment_destination_fingerprint=destination,
     )
 

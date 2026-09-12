@@ -1,5 +1,6 @@
 {
   "_comment": [
+    "invoiceNumberHash is the local sha256 of a synthetic printed reference (CP-2026-0001, ...), the same derivation the intelligence service applies to real documents; no raw number is stored anywhere.",
     "Demo business used when DEMO_MODE=true. Loaded once per demo user by DemoSeedService.",
     "Everything that is NOT bank data (receivables, vendor invoices, tax obligation, tasks)",
     "lives here; bank accounts, past transactions and future bills come from nessie_mock.json.",
@@ -56,6 +57,7 @@
     {
       "sourceRecordId": "inv-cloud-provider-m10",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:7f2e9a2b3c097e4fa4e9f8995fc7bc0057344797775ed1f95c5873c551956493",
       "vendorDisplayName": "Cloud Provider",
       "amount": 960.00,
       "previousAmount": 960.00,
@@ -65,12 +67,13 @@
       "paidDayOffset": -284,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m9",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:c4a88f94b08c9d8c0573502006869ba807841f6618e65c05f78e29b4f781a8d8",
       "vendorDisplayName": "Cloud Provider",
       "amount": 975.00,
       "previousAmount": 960.00,
@@ -80,12 +83,13 @@
       "paidDayOffset": -254,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m8",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:92d79f53a797209241bf6cf5d417281366cff2e548053c966903ece52c8c51fa",
       "vendorDisplayName": "Cloud Provider",
       "amount": 970.00,
       "previousAmount": 975.00,
@@ -95,12 +99,13 @@
       "paidDayOffset": -224,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m7",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:1de1af08326d1035236958cbdceeb88d4cbd241a3b251993f6947e2b64475e6e",
       "vendorDisplayName": "Cloud Provider",
       "amount": 990.00,
       "previousAmount": 970.00,
@@ -110,12 +115,13 @@
       "paidDayOffset": -194,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m6",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:88fcc8b0bf96341c5cb2711f54e5809e52284a7367f2945b9ec21d789a5a3163",
       "vendorDisplayName": "Cloud Provider",
       "amount": 985.00,
       "previousAmount": 990.00,
@@ -125,12 +131,13 @@
       "paidDayOffset": -164,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m5",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:7aa2e7caa4bb62adf8b7c64dfb7b2c3451cd42b3187383ea51550ff183ef5468",
       "vendorDisplayName": "Cloud Provider",
       "amount": 1005.00,
       "previousAmount": 985.00,
@@ -140,12 +147,13 @@
       "paidDayOffset": -134,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m4",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:2da84a8dfffcdca14c3f88deb0745ab3a18099124cb6fa94ee9f9c68dae9ecf7",
       "vendorDisplayName": "Cloud Provider",
       "amount": 1000.00,
       "previousAmount": 1005.00,
@@ -155,12 +163,13 @@
       "paidDayOffset": -104,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m3",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:6b63494e8b966a0b918bda199ca4b180e706475ce2244b2b869096b7e71b266c",
       "vendorDisplayName": "Cloud Provider",
       "amount": 980.00,
       "previousAmount": 1000.00,
@@ -170,12 +179,13 @@
       "paidDayOffset": -74,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m2",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:f7d5493ac51a6ed3d9260630da2ed0fc5234ae0f8b856e25f82ded99c7442295",
       "vendorDisplayName": "Cloud Provider",
       "amount": 1015.00,
       "previousAmount": 980.00,
@@ -185,12 +195,13 @@
       "paidDayOffset": -44,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-m1",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:e204483b42acfa476a3380872aa9b47b997596122a9427b456fe4110a44b6135",
       "vendorDisplayName": "Cloud Provider",
       "amount": 995.00,
       "previousAmount": 1015.00,
@@ -200,12 +211,13 @@
       "paidDayOffset": -14,
       "status": "PAID",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": false
     },
     {
       "sourceRecordId": "inv-cloud-provider-current",
       "vendorKey": "cloud_provider",
+      "invoiceNumberHash": "sha256:a9f8e0330e0410bbd92f168f6938ee23c88e1903734ee07dec29645a08b3a97b",
       "vendorDisplayName": "Cloud Provider",
       "amount": 1000.00,
       "previousAmount": 995.00,
@@ -214,12 +226,13 @@
       "dueDayOffset": 5,
       "status": "OPEN",
       "recurring": true,
-      "paymentDestinationFingerprint": "sha256:9f1c0a5e7b2d4e6a8c0b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c",
+      "paymentDestinationFingerprint": "sha256:26f9b4f9eeb203f5a490f9b6e8302f4c092d53feabdbe4d133239a2b0aa17208",
       "createsCashEvent": true
     },
     {
       "sourceRecordId": "inv-contractor-current",
       "vendorKey": "design_contractor",
+      "invoiceNumberHash": "sha256:e8f2807c21b8f939ba20ff1773888fb346cda94fd754bf1c1ef7d42139aeb64d",
       "vendorDisplayName": "Northside Design Studio",
       "amount": 2500.00,
       "category": "contractor",

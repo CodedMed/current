@@ -36,17 +36,21 @@ public class InvoiceService {
     public Invoice create(UUID userId, CreateInvoiceRequest request) {
         Instant now = Instant.now();
         Invoice invoice = new Invoice(UUID.randomUUID(), userId, request.vendorKey(),
-                request.vendorDisplayName(), null, request.amount(), request.previousAmount(),
+                request.vendorDisplayName(), request.invoiceNumberHash(), request.amount(), request.previousAmount(),
                 request.invoiceDate(), request.dueDate(), null, "EXPECTED", request.recurring(),
                 request.paymentDestinationFingerprint(), "DOCUMENT", request.confidence(), now);
         invoiceRepository.insert(invoice);
         // An undated obligation enters today's forecast, without inventing a due date on the invoice.
-        LocalDate eventDate = request.dueDate() != null ? request.dueDate() : LocalDate.now(ZoneOffset.UTC);
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate eventDate = request.dueDate() != null ? request.dueDate() : today;
+        // A due date already behind us is an overdue obligation, not a future one: it still
+        // reduces the forecast, and it belongs in the overdue views rather than the upcoming ones.
+        CashEventStatus status = eventDate.isBefore(today) ? CashEventStatus.OVERDUE : CashEventStatus.EXPECTED;
         cashEventRepository.insert(new CashEvent(UUID.randomUUID(), userId,
                 eventDate.atStartOfDay(ZoneOffset.UTC).toInstant(), request.amount(), Direction.OUT,
                 request.category(), CashEventSource.DOCUMENT, invoice.id().toString(),
                 request.vendorDisplayName() == null ? request.vendorKey() : request.vendorDisplayName(),
-                request.recurring(), request.confidence(), CashEventStatus.EXPECTED, Map.of()));
+                request.recurring(), request.confidence(), status, Map.of()));
         return invoiceRepository.findById(userId, invoice.id()).orElseThrow();
     }
 

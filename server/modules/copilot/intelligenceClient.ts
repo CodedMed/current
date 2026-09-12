@@ -16,6 +16,7 @@ export interface InvoiceUnderReview {
   amount: number;
   invoiceDate: string | null;
   dueDate: string | null;
+  invoiceNumberHash: string | null;
   paymentDestinationFingerprint: string | null;
 }
 
@@ -23,6 +24,7 @@ export interface HistoricalInvoice {
   amount: number;
   invoiceDate: string | null;
   paidDate: string | null;
+  invoiceNumberHash: string | null;
   paymentDestinationFingerprint: string | null;
 }
 
