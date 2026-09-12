@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/* Classes composed at runtime (animation stagger) must be listed for the scanner. */
+@source inline("stagger-{1..12}");
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Surfaces & ink */
+  --color-surface: #f5f6f8;
+  --color-panel: #ffffff;
+  --color-ink: #0b1220;
+  --color-ink-secondary: #475467;
+  --color-ink-muted: #7d8696;
+  --color-line: #e4e7ec;
+  --color-line-strong: #cfd5df;
+
+  /* Brand navy (rails, hero) */
+  --color-navy-950: #060b16;
+  --color-navy-900: #0b1220;
+  --color-navy-800: #111c33;
+  --color-navy-700: #1a2a4d;
+  --color-navy-600: #24396a;
+
+  /* Brand blue (actions) */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7fe;
+  --color-brand-200: #bfd4fd;
+  --color-brand-300: #93b8fb;
+  --color-brand-400: #6093f6;
+  --color-brand-500: #3b6ff0;
+  --color-brand-600: #2554e3;
+  --color-brand-700: #1d41cc;
+  --color-brand-800: #1d37a5;
+  --color-brand-900: #1d3283;
+
+  /* Semantic */
+  --color-positive-50: #ecfdf3;
+  --color-positive-100: #d1fadf;
+  --color-positive-500: #12b76a;
+  --color-positive-600: #039855;
+  --color-positive-700: #027a48;
+  --color-warning-50: #fffaeb;
+  --color-warning-100: #fef0c7;
+  --color-warning-500: #f79009;
+  --color-warning-600: #dc6803;
+  --color-warning-700: #b54708;
+  --color-danger-50: #fef3f2;
+  --color-danger-100: #fee4e2;
+  --color-danger-500: #f04438;
+  --color-danger-600: #d92d20;
+  --color-danger-700: #b42318;
+
+  /* Data-viz roles (validated palette, light surface) */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-viz-grid: #e6e5df;
+  --color-viz-axis: #c3c2b7;
+  --color-viz-muted: #898781;
+
+  --shadow-card: 0 1px 2px rgb(11 18 32 / 0.04), 0 12px 32px -16px rgb(11 18 32 / 0.18);
+  --shadow-float: 0 24px 60px -24px rgb(11 18 32 / 0.4);
+  --shadow-ring: 0 0 0 1px rgb(11 18 32 / 0.06);
+
+  --animate-fade-up: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.35s ease-out both;
+  --animate-scale-in: scale-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-pulse-soft: pulse-soft 1.8s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-draw: draw 0.6s ease-out 0.2s both;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.6); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes draw {
+    from { stroke-dashoffset: 60; }
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--color-brand-100);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
+
+/* Per-item entrance delay: stagger-1 … stagger-12 */
+@utility stagger-* {
+  animation-delay: calc(--value(integer) * 60ms);
+}
+
+@utility skeleton {
+  background: linear-gradient(90deg, #eceef2 25%, #f7f8fa 50%, #eceef2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 0.5rem;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility hairline {
+  border-color: var(--color-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
