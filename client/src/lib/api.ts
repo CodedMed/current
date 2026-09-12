@@ -1,8 +1,18 @@
 import type {
   ApiErrorBody,
   BusinessTypeId,
+  CashTransaction,
+  CashflowDashboard,
+  CashflowFilters,
   DashboardResponse,
   FeatureId,
+  LoanOffer,
+  LoanOffersResponse,
+  NewTransactionInput,
+  ReviewDecision,
+  SyncResponse,
+  TransactionListResponse,
+  UpdateTransactionInput,
   IdentitySessionResponse,
   IdentityStatusResponse,
   OnboardingCatalog,
@@ -10,6 +20,25 @@ import type {
   SandboxIdentityOutcome,
   SessionResponse,
 } from '../../../shared/types.ts';
+
+export interface TransactionListParams {
+  companyId: string;
+  accountIds: string[] | null;
+  limit?: number;
+  offset?: number;
+  query?: string;
+  scope?: 'activity' | 'scheduled' | 'all';
+}
+
+function toQuery(params: Record<string, string | number | null | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === '') continue;
+    search.set(key, String(value));
+  }
+  const s = search.toString();
+  return s ? `?${s}` : '';
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -33,7 +62,7 @@ export class ApiError extends Error {
 export const UNAUTHENTICATED_EVENT = 'keel:unauthenticated';
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
 }
@@ -95,5 +124,48 @@ export const api = {
     provisionStatus: () => request<ProvisionStatus>('/api/onboarding/provision/status'),
   },
 
+  /** Nessie-backed dashboard (parked; the route is not mounted while the mock API is in use). */
   dashboard: (refresh = false) => request<DashboardResponse>(`/api/dashboard${refresh ? '?refresh=1' : ''}`),
+
+  cashflow: {
+    dashboard: (filters: CashflowFilters, signal?: AbortSignal) =>
+      request<CashflowDashboard>(
+        `/api/cashflow/dashboard${toQuery({
+          company: filters.companyId,
+          accounts: filters.accountIds?.join(',') ?? null,
+          period: filters.period,
+          horizon: filters.horizon,
+          scenario: filters.scenario,
+        })}`,
+        { signal },
+      ),
+    transactions: (params: TransactionListParams, signal?: AbortSignal) =>
+      request<TransactionListResponse>(
+        `/api/cashflow/transactions${toQuery({
+          company: params.companyId,
+          accounts: params.accountIds?.join(',') ?? null,
+          limit: params.limit,
+          offset: params.offset,
+          q: params.query,
+          scope: params.scope,
+        })}`,
+        { signal },
+      ),
+    transaction: (companyId: string, id: string) => request<CashTransaction>(`/api/cashflow/transactions/${encodeURIComponent(id)}${toQuery({ company: companyId })}`),
+    addTransaction: (companyId: string, input: NewTransactionInput) =>
+      request<CashTransaction>('/api/cashflow/transactions', { method: 'POST', body: { companyId, ...input } }),
+    updateTransaction: (companyId: string, id: string, patch: UpdateTransactionInput) =>
+      request<CashTransaction>(`/api/cashflow/transactions/${encodeURIComponent(id)}`, { method: 'PATCH', body: { companyId, ...patch } }),
+    sync: (companyId: string) => request<SyncResponse>('/api/cashflow/sync', { method: 'POST', body: { companyId } }),
+    reviews: {
+      decide: (companyId: string, id: string, decision: ReviewDecision, note?: string | null) =>
+        request<CashTransaction>(`/api/cashflow/transactions/${encodeURIComponent(id)}/review`, { method: 'POST', body: { companyId, decision, note: note ?? null } }),
+    },
+    loans: {
+      offers: (companyId: string, signal?: AbortSignal) => request<LoanOffersResponse>(`/api/cashflow/loan-offers${toQuery({ company: companyId })}`, { signal }),
+      apply: (companyId: string, offerId: string, amount: number) =>
+        request<LoanOffer>(`/api/cashflow/loan-offers/${encodeURIComponent(offerId)}/apply`, { method: 'POST', body: { companyId, amount } }),
+      save: (companyId: string, offerId: string) => request<LoanOffer>(`/api/cashflow/loan-offers/${encodeURIComponent(offerId)}/save`, { method: 'POST', body: { companyId } }),
+    },
+  },
 };

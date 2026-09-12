@@ -1,21 +1,14 @@
 import type { FeatureId, ProvisionStage, ProvisionStatus } from '../../../shared/types.ts';
 import { PROVISION_STAGES } from '../../../shared/types.ts';
 import { addDays, clampDayOfMonth, eachDay, isoDate, startOfToday } from '../../lib/dates.ts';
+import { IntegrationError } from '../../lib/errors.ts';
 import { mapWithConcurrency } from '../../lib/http.ts';
 import { createLogger } from '../../lib/logger.ts';
 import { createRng, type Rng } from '../../lib/random.ts';
 import type { UserRecord, UserRepository } from '../../store/userStore.ts';
 import { profileFor, type AccountKey, type Cadence, type DemoProfile } from './demoProfiles.ts';
-import type {
-  NessieApi,
-  NewAccount,
-  NewBill,
-  NewCustomer,
-  NewDeposit,
-  NewPurchase,
-  NewTransfer,
-  NewWithdrawal,
-} from './types.ts';
+import { INTERNAL_TRANSFER_PREFIX } from './types.ts';
+import type { NessieApi, NewAccount, NewBill, NewCustomer, NewDeposit, NewPurchase, NewWithdrawal } from './types.ts';
 
 const log = createLogger('provision');
 
@@ -32,7 +25,6 @@ export interface SeedPlan {
   withdrawals: Array<{ account: AccountKey; input: NewWithdrawal }>;
   purchases: Array<{ account: AccountKey; merchant: string; input: Omit<NewPurchase, 'merchant_id'> }>;
   bills: Array<{ account: AccountKey; input: NewBill }>;
-  transfers: Array<{ from: AccountKey; to: AccountKey; input: Omit<NewTransfer, 'payee_id'> }>;
   /** Net executed movement per account over the window; used to detect balance semantics. */
   expectedNet: Record<AccountKey, number>;
 }
@@ -112,7 +104,6 @@ export function buildSeedPlan(profile: DemoProfile, user: UserRecord, features: 
     withdrawals: [],
     purchases: [],
     bills: [],
-    transfers: [],
     expectedNet,
   };
 
@@ -121,7 +112,7 @@ export function buildSeedPlan(profile: DemoProfile, user: UserRecord, features: 
       const amount = rng.amount(income.amount[0], income.amount[1]);
       plan.deposits.push({
         account: 'operating',
-        input: { medium: 'balance', transaction_date: isoDate(date), status: 'executed', amount, description: income.description },
+        input: { medium: 'balance', transaction_date: isoDate(date), status: 'completed', amount, description: income.description },
       });
       bump('operating', amount);
     }
@@ -134,7 +125,7 @@ export function buildSeedPlan(profile: DemoProfile, user: UserRecord, features: 
       plan.purchases.push({
         account: 'operating',
         merchant: expense.merchant,
-        input: { medium: 'balance', purchase_date: isoDate(date), amount, status: 'executed', description: expense.description },
+        input: { medium: 'balance', purchase_date: isoDate(date), amount, status: 'completed', description: expense.description },
       });
       bump('operating', -amount);
     }
@@ -145,7 +136,7 @@ export function buildSeedPlan(profile: DemoProfile, user: UserRecord, features: 
       const amount = rng.amount(withdrawal.amount[0], withdrawal.amount[1]);
       plan.withdrawals.push({
         account: 'operating',
-        input: { medium: 'balance', transaction_date: isoDate(date), status: 'executed', amount, description: withdrawal.description },
+        input: { medium: 'balance', transaction_date: isoDate(date), status: 'completed', amount, description: withdrawal.description },
       });
       bump('operating', -amount);
     }
@@ -159,7 +150,7 @@ export function buildSeedPlan(profile: DemoProfile, user: UserRecord, features: 
         input: {
           medium: 'balance',
           transaction_date: isoDate(date),
-          status: 'executed',
+          status: 'completed',
           amount: bill.amount,
           description: `Bill · ${bill.nickname} · ${bill.payee}`,
         },
@@ -214,15 +205,16 @@ export function buildSeedPlan(profile: DemoProfile, user: UserRecord, features: 
     }
   }
 
+  // Nessie transfers carry no destination account, so an internal move is recorded as a
+  // withdrawal from operating plus a matching deposit into reserve, tagged as a transfer.
   if (profile.reserveSweep) {
     const sweep = profile.reserveSweep;
+    const description = `${INTERNAL_TRANSFER_PREFIX}${sweep.description}`;
     for (const date of cadenceDates({ kind: 'monthly', day: sweep.day }, windowStart, windowEnd, rng)) {
       const amount = rng.amount(sweep.amount[0], sweep.amount[1]);
-      plan.transfers.push({
-        from: 'operating',
-        to: 'reserve',
-        input: { medium: 'balance', amount, transaction_date: isoDate(date), status: 'executed', description: sweep.description },
-      });
+      const transaction_date = isoDate(date);
+      plan.withdrawals.push({ account: 'operating', input: { medium: 'balance', transaction_date, status: 'completed', amount, description } });
+      plan.deposits.push({ account: 'reserve', input: { medium: 'balance', transaction_date, status: 'completed', amount, description } });
       bump('operating', -amount);
       bump('reserve', amount);
     }
@@ -275,7 +267,8 @@ export class Provisioner {
     void this.#run(user, job).catch((err: unknown) => {
       job.state = 'error';
       job.error = err instanceof Error ? err.message : String(err);
-      log.error('Provisioning failed', { userId: user.id, stage: job.stage, error: job.error });
+      const details = err instanceof IntegrationError ? err.details : undefined;
+      log.error('Provisioning failed', { userId: user.id, stage: job.stage, error: job.error, details });
     });
     return this.status(user);
   }
@@ -294,7 +287,7 @@ export class Provisioner {
       userId: user.id,
       mode: api.mode,
       businessType,
-      records: plan.deposits.length + plan.purchases.length + plan.withdrawals.length + plan.bills.length + plan.transfers.length,
+      records: plan.deposits.length + plan.purchases.length + plan.withdrawals.length + plan.bills.length,
     });
 
     // 1. Customer
@@ -328,12 +321,9 @@ export class Provisioner {
     );
     await mapWithConcurrency(plan.withdrawals, CONCURRENCY, (w) => api.createWithdrawal(accountIds[w.account], w.input));
 
-    // 4. Bills, receivables (already pending deposits above) and reserve sweeps
+    // 4. Bills (receivables were created above as pending deposits)
     advance('bills');
     await mapWithConcurrency(plan.bills, CONCURRENCY, (b) => api.createBill(accountIds[b.account], b.input));
-    await mapWithConcurrency(plan.transfers, CONCURRENCY, (t) =>
-      api.createTransfer(accountIds[t.from], { ...t.input, payee_id: accountIds[t.to] }),
-    );
 
     // 5. Analysis: confirm how the API treated balances, then persist the workspace
     advance('analysis');

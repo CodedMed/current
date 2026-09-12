@@ -306,3 +306,410 @@ export interface ApiErrorBody {
     details?: unknown;
   };
 }
+
+/* ───────────────────────── Cash-flow dashboard (mock API) ───────────────────────── */
+
+export const CASH_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'CREDIT', 'MONEY_MARKET', 'PAYMENT_PROCESSOR'] as const;
+export type CashAccountType = (typeof CASH_ACCOUNT_TYPES)[number];
+
+export type ConnectionStatus = 'CONNECTED' | 'RECONNECT_REQUIRED' | 'SYNCING';
+
+export interface CashAccount {
+  id: string;
+  institutionId: string;
+  institutionName: string;
+  name: string;
+  /** Last four digits, or null for processors without an account number. */
+  mask: string | null;
+  type: CashAccountType;
+  currency: 'USD';
+  /** Posted (ledger) balance. */
+  bookBalance: number;
+  /** Book balance less pending outflows. */
+  availableBalance: number;
+  lastSyncedAt: string;
+  connectionStatus: ConnectionStatus;
+  /** Alert when the projected balance falls below this; null when no floor is set. */
+  minimumBalance: number | null;
+}
+
+export const PAYMENT_METHODS = ['ACH', 'WIRE', 'CHECK', 'DEBIT_CARD', 'CREDIT_CARD', 'ZELLE', 'STRIPE', 'PAYPAL', 'CASH', 'OTHER'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const TRANSACTION_STATUSES = ['PENDING', 'POSTED', 'SCHEDULED', 'FAILED', 'CANCELLED'] as const;
+export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
+
+export type FlowDirection = 'INFLOW' | 'OUTFLOW';
+export type TransactionSource = 'BANK_SYNC' | 'MANUAL' | 'FORECAST';
+export type ForecastSource = 'MANUAL' | 'RECURRING' | 'INVOICE' | 'BILL' | 'MODEL';
+
+export interface CashTransaction {
+  id: string;
+  accountId: string;
+  date: string;
+  postedDate: string | null;
+  /** Always positive; `direction` carries the sign. */
+  amount: number;
+  direction: FlowDirection;
+  status: TransactionStatus;
+  paymentMethod: PaymentMethod;
+  merchant: string;
+  description: string;
+  categoryId: string;
+  source: TransactionSource;
+  /** Customer for inflows, when known. */
+  counterpartyId: string | null;
+  note: string | null;
+  /** Present on scheduled (forecast) entries only. */
+  forecast: { confidence: number; source: ForecastSource } | null;
+  /** Set when the charge looks unusual for this vendor; carries the team's decision once made. */
+  review: TransactionReview | null;
+}
+
+export interface CashCategory {
+  id: string;
+  name: string;
+  parentId: 'income' | 'expenses';
+}
+
+export interface CashCounterparty {
+  id: string;
+  name: string;
+}
+
+export type ForecastScenario = 'expected' | 'conservative' | 'optimistic';
+export const FORECAST_HORIZONS = [30, 60, 90, 180, 365] as const;
+export type ForecastHorizon = (typeof FORECAST_HORIZONS)[number];
+
+export interface CashflowFilters {
+  companyId: string;
+  /** null = every account. */
+  accountIds: string[] | null;
+  /** `last30`, `last90`, or a month as `YYYY-MM`. */
+  period: string;
+  horizon: ForecastHorizon;
+  scenario: ForecastScenario;
+}
+
+export interface PeriodOption {
+  id: string;
+  label: string;
+}
+
+export interface ResolvedPeriod extends PeriodOption {
+  start: string;
+  end: string;
+  days: number;
+  /** Describes the comparison window, e.g. "vs prior 30 days". */
+  compareLabel: string;
+}
+
+export interface KpiDelta {
+  /** Percent change versus the comparison window, null when there is no basis. */
+  pct: number | null;
+  abs: number;
+  prior: number;
+}
+
+export interface CashflowKpis {
+  totalCash: {
+    book: number;
+    available: number;
+    pending: number;
+    changeThisMonth: number;
+    monthLabel: string;
+    accountCount: number;
+  };
+  cashIn: { value: number; delta: KpiDelta };
+  cashOut: { value: number; delta: KpiDelta };
+  net: { value: number; cashIn: number; cashOut: number; delta: KpiDelta };
+  runway: {
+    state: 'burning' | 'positive';
+    /** Months of cash at the current burn; null when cash-flow positive. */
+    months: number | null;
+    averageMonthlyNet: number;
+    basisMonths: number;
+  };
+}
+
+export interface BalancePoint {
+  date: string;
+  balance: number;
+}
+
+export interface ProjectionPoint {
+  date: string;
+  projected: number;
+  low: number;
+  high: number;
+}
+
+export interface CashPosition {
+  history: BalancePoint[];
+  forecast: ProjectionPoint[];
+  horizon: ForecastHorizon;
+  scenario: ForecastScenario;
+  today: BalancePoint;
+  lowest: ProjectionPoint;
+  end: ProjectionPoint;
+  checkpoints: Array<{ days: number; date: string; balance: number }>;
+}
+
+export interface MonthlyFlow {
+  month: string;
+  label: string;
+  cashIn: number;
+  cashOut: number;
+  /** True for the current month (month to date). */
+  partial: boolean;
+}
+
+export interface UpcomingItem {
+  id: string;
+  date: string;
+  merchant: string;
+  description: string;
+  amount: number;
+  direction: FlowDirection;
+  categoryId: string;
+  categoryName: string;
+  accountId: string;
+  confidence: number;
+  source: ForecastSource;
+}
+
+export interface UpcomingCash {
+  windowDays: number;
+  windowEnd: string;
+  inflows: UpcomingItem[];
+  outflows: UpcomingItem[];
+  inflowCount: number;
+  outflowCount: number;
+  expectedIn: number;
+  expectedOut: number;
+  netImpact: number;
+}
+
+export interface BreakdownSlice {
+  id: string;
+  label: string;
+  amount: number;
+  /** 0..1 share of the total. */
+  share: number;
+}
+
+export interface Breakdown {
+  cashOut: BreakdownSlice[];
+  cashIn: BreakdownSlice[];
+  byCustomer: BreakdownSlice[];
+  totalOut: number;
+  totalIn: number;
+}
+
+export type InsightKind = 'low_balance' | 'spend_anomaly' | 'large_payment' | 'trend' | 'concentration' | 'connection' | 'review';
+export type InsightTone = 'warning' | 'positive' | 'info' | 'danger';
+
+export interface CashInsight {
+  id: string;
+  kind: InsightKind;
+  tone: InsightTone;
+  title: string;
+  body: string;
+  figures: Array<{ label: string; value: string; emphasis?: boolean }>;
+  accountId: string | null;
+  date: string | null;
+}
+
+export interface CashflowCompany {
+  id: string;
+  name: string;
+  legalName: string;
+}
+
+export interface CashflowDashboard {
+  generatedAt: string;
+  today: string;
+  company: CashflowCompany;
+  companies: CashflowCompany[];
+  filters: CashflowFilters;
+  periods: PeriodOption[];
+  period: ResolvedPeriod;
+  kpis: CashflowKpis;
+  cashPosition: CashPosition;
+  monthlyFlows: MonthlyFlow[];
+  upcoming: UpcomingCash;
+  breakdown: Breakdown;
+  accounts: CashAccount[];
+  categories: CashCategory[];
+  insights: CashInsight[];
+  reviews: ReviewQueue;
+  recentTransactions: CashTransaction[];
+  lastSyncedAt: string;
+  dataSource: { provider: 'mock'; label: string };
+}
+
+export interface TransactionListResponse {
+  items: CashTransaction[];
+  total: number;
+}
+
+export interface NewTransactionInput {
+  accountId: string;
+  date: string;
+  direction: FlowDirection;
+  amount: number;
+  merchant: string;
+  description?: string;
+  categoryId: string;
+  paymentMethod: PaymentMethod;
+  status: 'POSTED' | 'SCHEDULED';
+}
+
+export interface UpdateTransactionInput {
+  note?: string | null;
+  categoryId?: string;
+  description?: string;
+  merchant?: string;
+}
+
+export interface SyncResponse {
+  syncedAt: string;
+  accounts: CashAccount[];
+  /** Pending transactions that posted during this sync. */
+  postedCount: number;
+}
+
+/* ───────────────────────── Bill review ───────────────────────── */
+
+export type ReviewReason = 'above_typical' | 'below_typical' | 'possible_duplicate';
+export type ReviewStatus = 'open' | 'approved' | 'disputed';
+export type ReviewDecision = 'approve' | 'dispute' | 'reopen';
+
+export interface TransactionReview {
+  status: ReviewStatus;
+  reason: ReviewReason;
+  /** What this vendor usually bills (median of prior charges, or the matching charge for duplicates). */
+  expected: number;
+  typicalLow: number;
+  typicalHigh: number;
+  deviation: number;
+  deviationPct: number;
+  /** Prior charges the baseline was built from. */
+  sampleSize: number;
+  /** For possible duplicates: the earlier charge it matches. */
+  duplicateOf: string | null;
+  flaggedAt: string;
+  resolvedAt: string | null;
+  note: string | null;
+}
+
+export interface ReviewHistoryPoint {
+  id: string;
+  date: string;
+  amount: number;
+}
+
+export interface ReviewQueueItem {
+  transaction: CashTransaction;
+  accountName: string;
+  categoryName: string;
+  /** The prior charges from this vendor, oldest first. */
+  history: ReviewHistoryPoint[];
+}
+
+export interface ReviewQueue {
+  open: number;
+  approved: number;
+  disputed: number;
+  items: ReviewQueueItem[];
+}
+
+/* ───────────────────────── Financing ───────────────────────── */
+
+export type LoanProductType = 'LINE_OF_CREDIT' | 'SBA_7A' | 'TERM_LOAN' | 'REVENUE_BASED' | 'BUSINESS_CARD' | 'EQUIPMENT';
+export type CreditTier = 'A' | 'B' | 'C';
+
+export interface LoanPricing {
+  kind: 'amortized' | 'revolving' | 'revenue_share' | 'charge_card';
+  apr: number | null;
+  termMonths: number | null;
+  originationPct: number;
+  flatFeePct: number | null;
+  holdbackPct: number | null;
+  annualFee: number;
+  /** 0% intro period for cards. */
+  introMonths: number | null;
+  /** Monthly processor volume the holdback applies to (revenue-based only). */
+  remittanceBase: number | null;
+}
+
+export interface LoanCost {
+  monthlyPayment: number | null;
+  totalRepayment: number;
+  totalCost: number;
+  payoffMonths: number | null;
+}
+
+export interface LoanImpact {
+  runwayMonthsAdded: number | null;
+  lowestProjectedCashAfter: number;
+}
+
+export interface LoanApplication {
+  id: string;
+  amount: number;
+  startedAt: string;
+  status: 'started';
+  nextSteps: string[];
+}
+
+export interface LoanOffer {
+  id: string;
+  lenderId: string;
+  lenderName: string;
+  product: string;
+  type: LoanProductType;
+  amount: number;
+  minAmount: number;
+  maxAmount: number;
+  rateLabel: string;
+  termLabel: string;
+  fundingDays: string;
+  pricing: LoanPricing;
+  cost: LoanCost;
+  impact: LoanImpact;
+  fitReason: string;
+  highlights: string[];
+  requirements: string[];
+  recommended: boolean;
+  saved: boolean;
+  application: LoanApplication | null;
+}
+
+export interface CreditProfile {
+  tier: CreditTier;
+  score: number;
+  label: string;
+  summary: string;
+  factors: Array<{ label: string; value: string; impact: 'positive' | 'neutral' | 'negative' }>;
+  annualRevenue: number;
+  monthlyRevenue: number;
+  totalCash: number;
+  cashBufferMonths: number;
+  /** Positive when the business is burning cash; 0 when cash-flow positive. */
+  monthlyBurn: number;
+  runwayMonths: number | null;
+  lowestProjectedCash: number;
+  monthsToLowest: number;
+  existingDebtService: number;
+}
+
+export interface LoanOffersResponse {
+  generatedAt: string;
+  companyId: string;
+  headline: string;
+  subheadline: string;
+  profile: CreditProfile;
+  offers: LoanOffer[];
+  recommendedOfferId: string | null;
+}

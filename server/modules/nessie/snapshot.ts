@@ -29,7 +29,15 @@ export async function fetchSnapshot(api: NessieApi, workspace: WorkspaceState): 
       api.listBills(account._id),
       api.listTransfers(account._id),
     ]);
-    return { deposits, withdrawals, purchases, bills, transfers };
+    // Nessie's list responses do not always carry the owning account; stamp it from the request.
+    const id = account._id;
+    return {
+      deposits: deposits.map((d) => ({ ...d, payee_id: d.payee_id ?? id })),
+      withdrawals: withdrawals.map((w) => ({ ...w, payer_id: w.payer_id ?? id })),
+      purchases: purchases.map((p) => ({ ...p, payer_id: p.payer_id ?? id })),
+      bills: bills.map((b) => ({ ...b, account_id: b.account_id ?? id })),
+      transfers: transfers.map((t) => ({ ...t, payer_id: t.payer_id ?? id })),
+    };
   });
 
   const purchases = uniqueById(perAccount.flatMap((p) => p.purchases));

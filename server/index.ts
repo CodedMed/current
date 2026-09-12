@@ -11,12 +11,13 @@ const app = createApp(services);
 
 const server = app.listen(config.port, () => {
   const mode = (m: 'live' | 'sandbox') => (m === 'live' ? 'LIVE   ' : 'SANDBOX');
+  const { integrations } = services.config;
   log.info(`Keel API listening on http://localhost:${config.port} (${config.env})`);
-  log.info(`  Google sign-in  ${mode(config.integrations.google)}`);
-  log.info(`  Persona KYC/AML ${mode(config.integrations.persona)}`);
-  log.info(`  Nessie banking  ${mode(config.integrations.nessie)}`);
+  log.info(`  Google sign-in  ${mode(integrations.google)}`);
+  log.info(`  Persona KYC/AML ${services.identityBypassed ? 'BYPASS ' : mode(integrations.persona)}`);
+  log.info(`  Nessie banking  ${mode(integrations.nessie)} (dashboard currently uses the mock cash-flow API)`);
   if (!config.isProduction) log.info(`  App URL         ${config.appUrl}`);
-  for (const note of config.notes) log.warn(note);
+  for (const note of services.config.notes) log.warn(note);
 });
 
 const shutdown = (signal: string) => {

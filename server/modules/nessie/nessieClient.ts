@@ -55,7 +55,7 @@ export class HttpNessieClient implements NessieApi {
     return this.#create<NessieAccount>(`/customers/${customerId}/accounts`, input);
   }
   listAccounts(customerId: string) {
-    return this.#get<NessieAccount[]>(`/customers/${customerId}/accounts`);
+    return this.#list<NessieAccount>(`/customers/${customerId}/accounts`);
   }
   getAccount(id: string) {
     return this.#get<NessieAccount>(`/accounts/${id}`);
@@ -70,31 +70,31 @@ export class HttpNessieClient implements NessieApi {
     return this.#create<NessieDeposit>(`/accounts/${accountId}/deposits`, input);
   }
   listDeposits(accountId: string) {
-    return this.#get<NessieDeposit[]>(`/accounts/${accountId}/deposits`);
+    return this.#list<NessieDeposit>(`/accounts/${accountId}/deposits`);
   }
   createWithdrawal(accountId: string, input: NewWithdrawal) {
     return this.#create<NessieWithdrawal>(`/accounts/${accountId}/withdrawals`, input);
   }
   listWithdrawals(accountId: string) {
-    return this.#get<NessieWithdrawal[]>(`/accounts/${accountId}/withdrawals`);
+    return this.#list<NessieWithdrawal>(`/accounts/${accountId}/withdrawals`);
   }
   createPurchase(accountId: string, input: NewPurchase) {
     return this.#create<NessiePurchase>(`/accounts/${accountId}/purchases`, input);
   }
   listPurchases(accountId: string) {
-    return this.#get<NessiePurchase[]>(`/accounts/${accountId}/purchases`);
+    return this.#list<NessiePurchase>(`/accounts/${accountId}/purchases`);
   }
   createBill(accountId: string, input: NewBill) {
     return this.#create<NessieBill>(`/accounts/${accountId}/bills`, input);
   }
   listBills(accountId: string) {
-    return this.#get<NessieBill[]>(`/accounts/${accountId}/bills`);
+    return this.#list<NessieBill>(`/accounts/${accountId}/bills`);
   }
   createTransfer(accountId: string, input: NewTransfer) {
     return this.#create<NessieTransfer>(`/accounts/${accountId}/transfers`, input);
   }
   listTransfers(accountId: string) {
-    return this.#get<NessieTransfer[]>(`/accounts/${accountId}/transfers`);
+    return this.#list<NessieTransfer>(`/accounts/${accountId}/transfers`);
   }
 
   #url(path: string): string {
@@ -106,6 +106,14 @@ export class HttpNessieClient implements NessieApi {
   async #get<T>(path: string): Promise<T> {
     const res = await this.#send<T>('GET', path);
     if (!res.ok || res.body === null) throw this.#error(path, res.status, res.body, res.text);
+    return res.body;
+  }
+
+  /** Nessie answers 404 ("No … found") for an empty collection; treat that as an empty list. */
+  async #list<T>(path: string): Promise<T[]> {
+    const res = await this.#send<T[] | string>('GET', path);
+    if (res.status === 404 && /no .* found/i.test(res.text)) return [];
+    if (!res.ok || !Array.isArray(res.body)) throw this.#error(path, res.status, res.body, res.text);
     return res.body;
   }
 

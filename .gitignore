@@ -1,7 +1,28 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+build/
+coverage/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Environment and secrets (the template with blank values stays tracked)
 .env
 .env.*
 !.env.example
+*.local
+*.pem
+*.key
+*.p12
+
+# Local tool state
+.claude/settings.local.json
 *.log
+npm-debug.log*
+
+# OS
 .DS_Store
+Thumbs.db

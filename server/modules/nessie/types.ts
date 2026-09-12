@@ -38,7 +38,13 @@ export interface NessieMerchant {
   geocode?: { lat: number; lng: number };
 }
 
-export type NessieTransactionStatus = 'pending' | 'cancelled' | 'executed';
+/** Nessie accepts pending | cancelled | completed; older data may carry the legacy "executed". */
+export type NessieTransactionStatus = 'pending' | 'cancelled' | 'completed' | 'executed';
+
+/** True for a transaction that has settled and therefore affects cash. */
+export function isSettled(status: string): boolean {
+  return status === 'completed' || status === 'executed';
+}
 
 export interface NessieDeposit {
   _id: string;
@@ -92,12 +98,15 @@ export interface NessieTransfer {
   type: 'p2p';
   transaction_date: string;
   status: NessieTransactionStatus;
-  medium: 'balance' | 'rewards';
+  medium?: 'balance' | 'rewards';
   payer_id: string;
-  payee_id: string;
+  payee_id?: string;
   amount: number;
   description: string;
 }
+
+/** Description prefix that marks a deposit/withdrawal pair as an internal move between own accounts. */
+export const INTERNAL_TRANSFER_PREFIX = 'Transfer · ';
 
 /* ───── Create payloads ───── */
 
@@ -155,9 +164,8 @@ export interface NewBill {
   payment_amount: number;
 }
 
+/** Nessie's transfer schema carries no destination account, so it behaves like a debit on the payer. */
 export interface NewTransfer {
-  medium: 'balance';
-  payee_id: string;
   amount: number;
   transaction_date: string;
   status: NessieTransactionStatus;

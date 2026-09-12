@@ -18,7 +18,9 @@ export function createSessionMiddleware(config: AppConfig) {
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: config.isProduction,
+      // Secure cookies only work over HTTPS; follow the public URL's scheme so a
+      // production build served over plain HTTP (local preview, internal demo) still signs in.
+      secure: config.appUrl.startsWith('https://'),
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   });

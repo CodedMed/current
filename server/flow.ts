@@ -20,9 +20,12 @@ export function acceptCompletedPolicy(config: AppConfig): boolean {
 export function computeNextStep(user: UserRecord | null, config: AppConfig): FlowStep {
   if (!user) return 'signup';
   if (!isIdentityVerified(user.identity.status, acceptCompletedPolicy(config))) return 'verify';
-  if (!user.onboarding.businessType) return 'business-type';
-  if (user.onboarding.features.length === 0) return 'features';
-  if (!user.workspace) return 'setup';
+  // Business profile, priorities, and Nessie workspace setup are parked for now:
+  // once identity is verified the journey lands on the dashboard, which is served
+  // by the mock cash-flow API. Restore these lines to bring the steps back.
+  // if (!user.onboarding.businessType) return 'business-type';
+  // if (user.onboarding.features.length === 0) return 'features';
+  // if (!user.workspace) return 'setup';
   return 'dashboard';
 }
 

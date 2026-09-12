@@ -2,9 +2,11 @@
 
 A production-style demo of the full onboarding journey for a cash-flow management product:
 
-**Sign up → Google → Persona KYC/AML verification → Business type → Priorities → Nessie data → Cash-flow dashboard**
+**Sign up → Google → Persona KYC/AML verification → Cash-flow dashboard**
 
 Everything runs from one repository: an Express 5 API (Node 24, TypeScript run natively) and a React 19 + Tailwind CSS 4 client built with Vite 8.
+
+> **Current state.** Persona verification is live (set `IDENTITY_BYPASS` to `true` in `server/services.ts` to skip it while developing). Once verified, the journey lands on the dashboard, which is powered by a mock cash-flow API that runs entirely in Node (`server/modules/cashflow/mock/`); the business-type, priorities, and Nessie workspace steps are parked in `server/flow.ts` and can be restored by uncommenting three lines. See [Cash-flow dashboard](#cash-flow-dashboard-mock-api) below.
 
 ## Quick start
 
@@ -48,6 +50,34 @@ Get a key at http://api.nessieisreal.com and set `NESSIE_API_KEY`. During onboar
 | `npm start` | Serves the API and the built client from one process (`NODE_ENV=production`) |
 | `npm run typecheck` | Type-checks server and client with TypeScript 7 |
 
+## Cash-flow dashboard (mock API)
+
+The dashboard answers four questions at a glance: how much cash there is right now, what is coming in and going out, what the next 30–90 days look like, and what needs attention. All of it is served by `GET /api/cashflow/dashboard`, which builds KPIs, a balance history, a scenario-based projection, monthly flows, upcoming cash, breakdowns, insights, and recent activity from a deterministic in-memory ledger. Two sample companies are included (Acme Inc., which is cash-flow positive, and Northwind Studio, which is burning cash), so both states of the runway tile and the low-balance insight can be seen.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/cashflow/companies` | Sample companies available in the company selector |
+| `GET /api/cashflow/dashboard?company=&accounts=a,b&period=last30&horizon=90&scenario=expected` | Everything the dashboard page renders. `period` accepts `last30`, `last90`, or a month like `2026-08`; `horizon` is 30/60/90/180/365; `scenario` is `expected`, `conservative`, or `optimistic` |
+| `GET /api/cashflow/transactions?company=&accounts=&q=&limit=&offset=&scope=` | Paged, searchable activity (`scope=activity`, `scheduled`, or `all`) |
+| `GET /api/cashflow/transactions/:id` | One transaction (the detail drawer) |
+| `POST /api/cashflow/transactions` | Add a posted transaction or schedule a future one; scheduled entries feed upcoming cash and the forecast |
+| `PATCH /api/cashflow/transactions/:id` | Edit merchant, description, category, or note |
+| `POST /api/cashflow/sync` | Marks accounts as synced and posts pending items that have settled |
+| `POST /api/cashflow/transactions/:id/review` | Record a decision on a flagged vendor bill: `approve`, `dispute`, or `reopen` |
+| `GET /api/cashflow/loan-offers?company=` | Financing offers underwritten from the ledger, with the credit profile behind them |
+| `POST /api/cashflow/loan-offers/:id/apply` | Start an application for a chosen amount |
+| `POST /api/cashflow/loan-offers/:id/save` | Save an offer for later (toggle) |
+
+Each signed-in user gets their own copy of the ledger, and ledgers regenerate when the calendar day changes. The generator (`ledger.ts`) turns a monthly budget in `profiles.ts` into dated transactions: payroll, rent, cloud, marketing, taxes, customer invoices, processor payouts, and so on, with a growth trend and a deliberate cloud-spend spike so the insights have something real to find.
+
+### Bill review
+
+Every vendor charge is compared with what that vendor usually bills (`server/modules/cashflow/mock/review.ts`). The baseline is the median of the vendor's recent charges in the same category; the tolerance comes from the vendor's own variability (a robust standard deviation), with a floor of 20% so steady bills like rent are held to a tight band while naturally noisy spend is not flagged for normal swings. Near-identical charges from the same vendor within three days are flagged as possible duplicates. Travel and office supplies are never flagged for size. Flags appear in the **Bills to review** panel with the vendor's last eight bills, on transaction rows, and in the transaction drawer. "Looks right" folds the charge into the vendor's baseline; "Dispute" leaves it out. Both sample companies ship with deliberate irregularities (`billingAnomalies` in `profiles.ts`) so the queue has real cases.
+
+### Financing offers
+
+`server/modules/cashflow/mock/lending.ts` underwrites the business from its own ledger: trailing 12-month revenue, cash buffer, net cash flow, revenue trend, customer concentration, and existing debt service produce a credit profile (tier A/B/C with a score and the factors behind it). A catalog of products from banks and fintechs (lines of credit, SBA 7(a), term loans, revenue-based advances, business cards, equipment financing) is then sized and priced from that profile: term loans are capped so debt service stays under 12% of revenue, revenue-based advances scale with processor volume, and card limits scale with card spend or cash on hand. One offer is recommended based on the situation (a line of credit to bridge a projected dip for a cash-burning company, an SBA loan for a profitable, growing one). The loan math lives in `shared/lending.ts` so the client can re-price an offer instantly when the amount changes, and each offer shows its effect on runway or on the lowest projected cash. Applications and saved offers are kept in the ledger; terms are illustrative.
+
 ## How the flow is enforced
 
 The server is the single authority on where a user is in the journey. `GET /api/session` returns the user plus a `nextStep`, computed from identity status, onboarding answers, and whether a workspace exists. Client routes only translate that into redirects, so refreshing, deep-linking, or skipping ahead always lands on the right screen, and every API route is guarded by the same rules (`server/lib/guards.ts`).
@@ -65,13 +95,14 @@ server/
   store/           UserRepository interface + in-memory implementation
   modules/
     auth/          Google OAuth (PKCE) provider, sandbox provider, routes
-    identity/      Persona REST client, identity service, webhook verification
-    onboarding/    Business-type and feature catalog (mock data) + routes
-    nessie/        Nessie API client, in-memory twin, demo profiles, provisioner
-    cashflow/      Snapshot → dashboard model builder + route
+    identity/      Persona REST client, identity service, webhook verification, bypass service
+    onboarding/    Business-type and feature catalog (mock data) + routes (parked)
+    nessie/        Nessie API client, in-memory twin, demo profiles, provisioner (parked)
+    cashflow/      Nessie snapshot → dashboard builder (parked)
+    cashflow/mock/ Company profiles, ledger generator, analytics, bill review, lending, store, and the /api/cashflow routes
 client/src/
   pages/           SignUp, VerifyIdentity, onboarding/*, Dashboard
-  components/      UI primitives, onboarding shell + stepper, charts, dashboard modules
+  components/      UI primitives, onboarding shell + stepper, charts, cashflow/ (dashboard panels, top bar, drawer, dialog)
   lib/             API client, session context, formatting
 ```
 

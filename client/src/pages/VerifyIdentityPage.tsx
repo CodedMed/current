@@ -251,7 +251,7 @@ export default function VerifyIdentityPage() {
             <SuccessCheck />
             <div>
               <p className="text-lg font-bold text-ink">You're verified</p>
-              <p className="mt-1 text-sm text-ink-secondary">Taking you to business setup…</p>
+              <p className="mt-1 text-sm text-ink-secondary">Opening your dashboard…</p>
             </div>
             <Button variant="secondary" onClick={() => void refresh()} iconRight={<ArrowRight className="size-4" aria-hidden="true" />}>
               Continue now

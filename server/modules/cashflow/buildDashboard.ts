@@ -17,7 +17,7 @@ import type {
 import { addDays, clampDayOfMonth, daysBetween, eachDay, isoDate, parseIsoDate, startOfToday, startOfWeek } from '../../lib/dates.ts';
 import type { UserRecord, WorkspaceState } from '../../store/userStore.ts';
 import { businessTypeLabel } from '../onboarding/catalog.ts';
-import type { NessieAccount, NessieSnapshot } from '../nessie/types.ts';
+import { INTERNAL_TRANSFER_PREFIX, isSettled, type NessieAccount, type NessieSnapshot } from '../nessie/types.ts';
 
 /**
  * Transforms a raw Nessie snapshot into the dashboard model. Pure and
@@ -77,7 +77,7 @@ interface Flow {
 
 function netExecuted(account: NessieAccount, s: NessieSnapshot): number {
   const id = account._id;
-  const executed = <T extends { status: string }>(xs: T[]) => xs.filter((x) => x.status === 'executed');
+  const executed = <T extends { status: string }>(xs: T[]) => xs.filter((x) => isSettled(x.status));
   return (
     sum(executed(s.deposits).filter((d) => d.payee_id === id).map((d) => d.amount)) -
     sum(executed(s.withdrawals).filter((w) => w.payer_id === id).map((w) => w.amount)) -
@@ -98,24 +98,25 @@ function normaliseAccounts(snapshot: NessieSnapshot, workspace: WorkspaceState):
 function normaliseFlows(snapshot: NessieSnapshot, accountNames: Map<string, string>): Flow[] {
   const flows: Flow[] = [];
   for (const d of snapshot.deposits) {
-    if (d.status !== 'executed') continue;
+    if (!isSettled(d.status)) continue;
+    const internal = d.description.startsWith(INTERNAL_TRANSFER_PREFIX);
     flows.push({
       isBill: false,
       item: {
         id: d._id,
         date: d.transaction_date,
         description: d.description,
-        counterparty: counterpartyOf(d.description),
-        category: incomeCategory(d.description),
+        counterparty: internal ? (accountNames.get(d.payee_id) ?? 'Reserve') : counterpartyOf(d.description),
+        category: internal ? 'Transfers' : incomeCategory(d.description),
         amount: money(d.amount),
-        direction: 'in',
-        kind: 'deposit',
+        direction: internal ? 'internal' : 'in',
+        kind: internal ? 'transfer' : 'deposit',
         accountId: d.payee_id,
       },
     });
   }
   for (const p of snapshot.purchases) {
-    if (p.status !== 'executed') continue;
+    if (!isSettled(p.status)) continue;
     const merchant = snapshot.merchants[p.merchant_id] ?? { name: 'Merchant', category: 'Other' };
     flows.push({
       isBill: false,
@@ -133,8 +134,9 @@ function normaliseFlows(snapshot: NessieSnapshot, accountNames: Map<string, stri
     });
   }
   for (const w of snapshot.withdrawals) {
-    if (w.status !== 'executed') continue;
+    if (!isSettled(w.status)) continue;
     const isBill = w.description.toLowerCase().startsWith('bill ·');
+    const internal = w.description.startsWith(INTERNAL_TRANSFER_PREFIX);
     flows.push({
       isBill,
       item: {
@@ -142,23 +144,23 @@ function normaliseFlows(snapshot: NessieSnapshot, accountNames: Map<string, stri
         date: w.transaction_date,
         description: w.description,
         counterparty: counterpartyOf(w.description),
-        category: withdrawalCategory(w.description),
+        category: internal ? 'Transfers' : withdrawalCategory(w.description),
         amount: money(w.amount),
-        direction: 'out',
-        kind: 'withdrawal',
+        direction: internal ? 'internal' : 'out',
+        kind: internal ? 'transfer' : 'withdrawal',
         accountId: w.payer_id,
       },
     });
   }
   for (const t of snapshot.transfers) {
-    if (t.status !== 'executed') continue;
+    if (!isSettled(t.status)) continue;
     flows.push({
       isBill: false,
       item: {
         id: t._id,
         date: t.transaction_date,
         description: t.description,
-        counterparty: accountNames.get(t.payee_id) ?? 'Reserve',
+        counterparty: (t.payee_id && accountNames.get(t.payee_id)) ?? 'Transfer',
         category: 'Transfers',
         amount: money(t.amount),
         direction: 'internal',

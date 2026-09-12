@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { notFound } from '../../lib/errors.ts';
+import { isSettled } from './types.ts';
 import type {
   NessieAccount,
   NessieApi,
@@ -83,7 +84,7 @@ export class InMemoryNessieClient implements NessieApi {
   async createDeposit(accountId: string, input: NewDeposit): Promise<NessieDeposit> {
     const account = this.#accounts.get(accountId) ?? raise(`account ${accountId}`);
     const record: NessieDeposit = { _id: objectId(), type: 'deposit', payee_id: accountId, ...input };
-    if (record.status === 'executed') account.balance = round(account.balance + record.amount);
+    if (isSettled(record.status)) account.balance = round(account.balance + record.amount);
     push(this.#deposits, accountId, record);
     return record;
   }
@@ -95,7 +96,7 @@ export class InMemoryNessieClient implements NessieApi {
   async createWithdrawal(accountId: string, input: NewWithdrawal): Promise<NessieWithdrawal> {
     const account = this.#accounts.get(accountId) ?? raise(`account ${accountId}`);
     const record: NessieWithdrawal = { _id: objectId(), type: 'withdrawal', payer_id: accountId, ...input };
-    if (record.status === 'executed') account.balance = round(account.balance - record.amount);
+    if (isSettled(record.status)) account.balance = round(account.balance - record.amount);
     push(this.#withdrawals, accountId, record);
     return record;
   }
@@ -108,7 +109,7 @@ export class InMemoryNessieClient implements NessieApi {
     const account = this.#accounts.get(accountId) ?? raise(`account ${accountId}`);
     await this.getMerchant(input.merchant_id);
     const record: NessiePurchase = { _id: objectId(), type: 'merchant', payer_id: accountId, ...input };
-    if (record.status === 'executed') account.balance = round(account.balance - record.amount);
+    if (isSettled(record.status)) account.balance = round(account.balance - record.amount);
     push(this.#purchases, accountId, record);
     return record;
   }
@@ -136,12 +137,8 @@ export class InMemoryNessieClient implements NessieApi {
 
   async createTransfer(accountId: string, input: NewTransfer): Promise<NessieTransfer> {
     const payer = this.#accounts.get(accountId) ?? raise(`account ${accountId}`);
-    const payee = this.#accounts.get(input.payee_id) ?? raise(`account ${input.payee_id}`);
     const record: NessieTransfer = { _id: objectId(), type: 'p2p', payer_id: accountId, ...input };
-    if (record.status === 'executed') {
-      payer.balance = round(payer.balance - record.amount);
-      payee.balance = round(payee.balance + record.amount);
-    }
+    if (isSettled(record.status)) payer.balance = round(payer.balance - record.amount);
     push(this.#transfers, accountId, record);
     return record;
   }

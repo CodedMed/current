@@ -5,13 +5,15 @@ import { attachUser } from './lib/guards.ts';
 import { createSessionMiddleware } from './lib/session.ts';
 import { toSessionResponse } from './flow.ts';
 import { createAuthRouter } from './modules/auth/routes.ts';
-import { createDashboardRouter } from './modules/cashflow/routes.ts';
+// Nessie-backed dashboard, parked while the dashboard runs on mock data.
+// import { createDashboardRouter } from './modules/cashflow/routes.ts';
+import { createCashflowRouter } from './modules/cashflow/mock/routes.ts';
 import { createIdentityRouter, createIdentityWebhookRouter } from './modules/identity/routes.ts';
 import { createOnboardingRouter } from './modules/onboarding/routes.ts';
 import type { Services } from './services.ts';
 
 export function createApp(services: Services): express.Express {
-  const { config, users, auth, identity, provisioner, nessie } = services;
+  const { config, users, auth, identity, provisioner, cashflow } = services;
   const app = express();
 
   app.disable('x-powered-by');
@@ -41,7 +43,8 @@ export function createApp(services: Services): express.Express {
   app.use('/api/auth', createAuthRouter({ config, users, provider: auth }));
   app.use('/api/identity', createIdentityRouter({ config, users, identity }));
   app.use('/api/onboarding', createOnboardingRouter({ config, users, provisioner }));
-  app.use('/api/dashboard', createDashboardRouter({ config, nessie }));
+  // app.use('/api/dashboard', createDashboardRouter({ config, nessie: services.nessie }));
+  app.use('/api/cashflow', createCashflowRouter({ config, store: cashflow }));
   app.use('/api', notFoundHandler);
 
   if (config.isProduction) {
