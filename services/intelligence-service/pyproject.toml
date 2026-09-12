@@ -1,0 +1,50 @@
+[project]
+name = "intelligence-service"
+version = "0.1.0"
+description = "Cash Flow Copilot AI/ML and private document understanding service"
+requires-python = ">=3.12"
+
+# Core dependencies keep the skeleton installable in seconds. The heavy document and ML stacks
+# arrive with the phases that need them (see the extras below).
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "python-multipart>=0.0.12",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# Phase 3 — local document pipeline
+documents = [
+    "pymupdf>=1.24",
+    "pillow>=10.4",
+    "pytesseract>=0.3.13",
+]
+# Phase 4 — invoice anomaly detection
+ml = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+]
+# Phases 5 and 7 — hosted reasoning and voice
+ai = [
+    "google-genai>=0.3",
+    "elevenlabs>=1.9",
+]
+dev = [
+    "pytest>=8.3",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["prompts/*.txt", "fixtures/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

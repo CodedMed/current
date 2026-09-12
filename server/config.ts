@@ -25,6 +25,15 @@ const envSchema = z.object({
 
   NESSIE_API_KEY: z.string().optional(),
   NESSIE_BASE_URL: z.url().default('https://api.nessieisreal.com'),
+
+  /** Where the cash-flow dashboard reads from: the Nessie workspace (default) or the generated sample ledger. */
+  CASHFLOW_SOURCE: z.enum(['nessie', 'mock']).default('nessie'),
+
+  /* Cash Flow Copilot backend services (Java ledger + Python intelligence). */
+  DEMO_MODE: z.stringbool().optional(),
+  INTERNAL_SERVICE_TOKEN: z.string().min(8).optional(),
+  LEDGER_SERVICE_URL: z.url().default('http://localhost:8080'),
+  INTELLIGENCE_SERVICE_URL: z.url().default('http://localhost:8000'),
 });
 
 export interface GoogleConfig {
@@ -48,6 +57,20 @@ export interface NessieConfig {
   baseUrl: string;
 }
 
+/**
+ * The Cash Flow Copilot backend: the Java ledger service (authoritative
+ * financial state) and the Python intelligence service (documents, risk,
+ * advisor). Express is their BFF; the browser never talks to them directly.
+ */
+export interface CopilotConfig {
+  /** Mirrors the services' DEMO_MODE: seeds the demo business for verified users and allows dev shortcuts. */
+  demoMode: boolean;
+  /** Shared secret both services require on every internal call. */
+  internalServiceToken: string;
+  ledgerUrl: string;
+  intelligenceUrl: string;
+}
+
 export interface AppConfig {
   env: 'development' | 'production' | 'test';
   isProduction: boolean;
@@ -57,6 +80,8 @@ export interface AppConfig {
   google: GoogleConfig | null;
   persona: PersonaConfig | null;
   nessie: NessieConfig | null;
+  cashflowSource: 'nessie' | 'mock';
+  copilot: CopilotConfig;
   integrations: IntegrationStatus;
   /** Human-readable notes about why an integration is in sandbox mode. */
   notes: string[];
@@ -119,6 +144,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     notes.push('NESSIE_API_KEY not set; banking data comes from the in-memory Nessie fixture.');
   }
 
+  let internalServiceToken = e.INTERNAL_SERVICE_TOKEN;
+  if (!internalServiceToken) {
+    if (isProduction) {
+      // A random token never matches the services, so the copilot routes fail closed rather than open.
+      internalServiceToken = randomBytes(24).toString('hex');
+      notes.push('INTERNAL_SERVICE_TOKEN not set; the ledger and intelligence services will reject every call until it is.');
+    } else {
+      internalServiceToken = 'local-dev-internal-token';
+    }
+  }
+  const demoMode = e.DEMO_MODE ?? !isProduction;
+  if (demoMode) notes.push('DEMO_MODE is on: verified users are seeded with the demo business in the ledger service.');
+
   return {
     env: e.NODE_ENV,
     isProduction,
@@ -128,6 +166,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     google,
     persona,
     nessie,
+    cashflowSource: e.CASHFLOW_SOURCE,
+    copilot: {
+      demoMode,
+      internalServiceToken,
+      ledgerUrl: e.LEDGER_SERVICE_URL.replace(/\/+$/, ''),
+      intelligenceUrl: e.INTELLIGENCE_SERVICE_URL.replace(/\/+$/, ''),
+    },
     integrations: {
       google: google ? 'live' : 'sandbox',
       persona: persona ? 'live' : 'sandbox',

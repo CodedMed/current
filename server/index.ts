@@ -15,7 +15,10 @@ const server = app.listen(config.port, () => {
   log.info(`Keel API listening on http://localhost:${config.port} (${config.env})`);
   log.info(`  Google sign-in  ${mode(integrations.google)}`);
   log.info(`  Persona KYC/AML ${services.identityBypassed ? 'BYPASS ' : mode(integrations.persona)}`);
-  log.info(`  Nessie banking  ${mode(integrations.nessie)} (dashboard currently uses the mock cash-flow API)`);
+  log.info(`  Nessie banking  ${mode(integrations.nessie)}`);
+  log.info(`  Dashboard data  ${services.cashflow.source === 'nessie' ? 'Nessie workspace' : 'generated sample ledger (CASHFLOW_SOURCE=mock)'}`);
+  log.info(`  Copilot ledger  ${config.copilot.ledgerUrl} (Java)`);
+  log.info(`  Copilot AI      ${config.copilot.intelligenceUrl} (Python)${config.copilot.demoMode ? ' · DEMO_MODE' : ''}`);
   if (!config.isProduction) log.info(`  App URL         ${config.appUrl}`);
   for (const note of services.config.notes) log.warn(note);
 });

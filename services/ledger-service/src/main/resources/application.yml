@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: ledger-service
+  flyway:
+    enabled: true
+    # Migrations are copied into the jar from the monorepo root db/migrations at build time.
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${LEDGER_SERVICE_PORT:8080}
+
+app:
+  demo-mode: ${DEMO_MODE:true}
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN:local-dev-internal-token}
+  demo-auth-subject: ${DEMO_AUTH_SUBJECT:demo-user}
+  default-horizon-days: 60
+  # postgresql://user:pass@host:5432/db?sslmode=require — empty starts a demo database locally.
+  database-url: ${DATABASE_URL:}
+  nessie:
+    base-url: ${NESSIE_BASE_URL:https://api.nessieisreal.com}
+    api-key: ${NESSIE_API_KEY:}
+    demo-customer-id: demo-customer-001
+
+logging:
+  level:
+    com.cashflowcopilot: INFO

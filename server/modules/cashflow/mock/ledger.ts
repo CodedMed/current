@@ -17,8 +17,16 @@ import { assessReviews } from './review.ts';
 export const HISTORY_DAYS = 400;
 export const FUTURE_DAYS = 370;
 
+/** The part of a company the analytics and lending code actually read. */
+export interface LedgerCompany {
+  id: string;
+  name: string;
+  legalName: string;
+  operatingAccountId: string;
+}
+
 export interface Ledger {
-  profile: CompanyProfile;
+  profile: LedgerCompany;
   /** ISO date the ledger was generated for; balances are "as of" this day. */
   today: string;
   generatedAt: string;

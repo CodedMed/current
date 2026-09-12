@@ -2,17 +2,17 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { FORECAST_HORIZONS, PAYMENT_METHODS, type CashflowFilters, type ForecastHorizon } from '../../../../shared/types.ts';
 import type { AppConfig } from '../../../config.ts';
-import { badRequest } from '../../../lib/errors.ts';
+import { badRequest, notFound } from '../../../lib/errors.ts';
 import { currentUser, requireProgress } from '../../../lib/guards.ts';
-import type { MockCashflowStore } from './store.ts';
+import type { CashflowStore } from '../store.ts';
 
 export interface CashflowRouterDeps {
   config: AppConfig;
-  store: MockCashflowStore;
+  store: CashflowStore;
 }
 
-const DEFAULT_COMPANY = 'acme';
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date.');
+const company = z.string().optional();
 
 const accountsParam = z
   .string()
@@ -21,7 +21,7 @@ const accountsParam = z
   .transform((list) => (list && list.length > 0 ? list : null));
 
 const dashboardQuery = z.object({
-  company: z.string().default(DEFAULT_COMPANY),
+  company,
   accounts: accountsParam,
   period: z.string().default('last30'),
   horizon: z
@@ -33,7 +33,7 @@ const dashboardQuery = z.object({
 });
 
 const listQuery = z.object({
-  company: z.string().default(DEFAULT_COMPANY),
+  company,
   accounts: accountsParam,
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
@@ -41,10 +41,10 @@ const listQuery = z.object({
   scope: z.enum(['activity', 'scheduled', 'all']).default('activity'),
 });
 
-const companyQuery = z.object({ company: z.string().default(DEFAULT_COMPANY) });
+const companyQuery = z.object({ company });
 
 const newTransactionBody = z.object({
-  companyId: z.string().default(DEFAULT_COMPANY),
+  companyId: company,
   accountId: z.string().min(1),
   date: isoDay,
   direction: z.enum(['INFLOW', 'OUTFLOW']),
@@ -57,23 +57,23 @@ const newTransactionBody = z.object({
 });
 
 const updateTransactionBody = z.object({
-  companyId: z.string().default(DEFAULT_COMPANY),
+  companyId: company,
   note: z.string().max(500).nullable().optional(),
   categoryId: z.string().min(1).optional(),
   description: z.string().trim().max(200).optional(),
   merchant: z.string().trim().max(80).optional(),
 });
 
-const syncBody = z.object({ companyId: z.string().default(DEFAULT_COMPANY) });
+const companyBody = z.object({ companyId: company });
 
 const reviewBody = z.object({
-  companyId: z.string().default(DEFAULT_COMPANY),
+  companyId: company,
   decision: z.enum(['approve', 'dispute', 'reopen']),
   note: z.string().max(500).nullable().optional(),
 });
 
 const applyBody = z.object({
-  companyId: z.string().default(DEFAULT_COMPANY),
+  companyId: company,
   amount: z.number().positive().max(100_000_000),
 });
 
@@ -81,92 +81,126 @@ function firstIssue(error: z.ZodError): string {
   return error.issues[0]?.message ?? 'Invalid request.';
 }
 
+/** The company to act on: the one requested (if it belongs to the user) or the user's first. */
+async function resolveCompany(store: CashflowStore, userId: string, requested: string | undefined): Promise<string> {
+  const companies = await store.companies(userId);
+  if (requested) {
+    if (!companies.some((c) => c.id === requested)) throw notFound('No such company.');
+    return requested;
+  }
+  const first = companies[0];
+  if (!first) throw notFound('No company is set up for this account yet.');
+  return first.id;
+}
+
 /**
- * Mock cash-flow API. Everything is computed in Node from a deterministic
- * ledger, so the dashboard has real behaviour (filters, scenarios, edits)
- * without a bank connection.
+ * Cash-flow API. The store decides where the ledger comes from: the Nessie
+ * banking API by default, or the generated sample ledger.
  */
 export function createCashflowRouter({ config, store }: CashflowRouterDeps): Router {
   const router = Router();
   router.use(requireProgress(config, 'dashboard'));
 
-  router.get('/companies', (_req, res) => {
-    res.json({ companies: store.companies() });
+  router.get('/companies', async (_req, res) => {
+    res.json({ companies: await store.companies(currentUser(res).id) });
   });
 
-  router.get('/dashboard', (req, res) => {
+  router.get('/dashboard', async (req, res) => {
     const parsed = dashboardQuery.safeParse(req.query);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
     const q = parsed.data;
-    const filters: CashflowFilters = { companyId: q.company, accountIds: q.accounts, period: q.period, horizon: q.horizon, scenario: q.scenario };
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, q.company);
+    const filters: CashflowFilters = { companyId, accountIds: q.accounts, period: q.period, horizon: q.horizon, scenario: q.scenario };
     res.set('Cache-Control', 'no-store');
-    res.json(store.dashboard(currentUser(res).id, filters));
+    res.json(await store.dashboard(userId, filters));
   });
 
-  router.get('/categories', (req, res) => {
+  router.get('/categories', async (req, res) => {
     const parsed = companyQuery.safeParse(req.query);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    res.json({ categories: store.ledger(currentUser(res).id, parsed.data.company).categories });
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.company);
+    const dashboard = await store.dashboard(userId, { companyId, accountIds: null, period: 'last30', horizon: 30, scenario: 'expected' });
+    res.json({ categories: dashboard.categories });
   });
 
-  router.get('/transactions', (req, res) => {
+  router.get('/transactions', async (req, res) => {
     const parsed = listQuery.safeParse(req.query);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
     const q = parsed.data;
-    res.json(store.listTransactions(currentUser(res).id, q.company, { accountIds: q.accounts, limit: q.limit, offset: q.offset, query: q.q ?? null, scope: q.scope }));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, q.company);
+    res.json(await store.listTransactions(userId, companyId, { accountIds: q.accounts, limit: q.limit, offset: q.offset, query: q.q ?? null, scope: q.scope }));
   });
 
-  router.get('/transactions/:id', (req, res) => {
+  router.get('/transactions/:id', async (req, res) => {
     const parsed = companyQuery.safeParse(req.query);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    res.json(store.getTransaction(currentUser(res).id, parsed.data.company, String(req.params.id)));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.company);
+    res.json(await store.getTransaction(userId, companyId, String(req.params.id)));
   });
 
-  router.post('/transactions', (req, res) => {
+  router.post('/transactions', async (req, res) => {
     const parsed = newTransactionBody.safeParse(req.body);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    const { companyId, ...input } = parsed.data;
-    res.status(201).json(store.addTransaction(currentUser(res).id, companyId, input));
+    const { companyId: requested, ...input } = parsed.data;
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, requested);
+    res.status(201).json(await store.addTransaction(userId, companyId, input));
   });
 
-  router.patch('/transactions/:id', (req, res) => {
+  router.patch('/transactions/:id', async (req, res) => {
     const parsed = updateTransactionBody.safeParse(req.body);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    const { companyId, ...patch } = parsed.data;
-    res.json(store.updateTransaction(currentUser(res).id, companyId, String(req.params.id), patch));
+    const { companyId: requested, ...patch } = parsed.data;
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, requested);
+    res.json(await store.updateTransaction(userId, companyId, String(req.params.id), patch));
   });
 
-  router.post('/sync', (req, res) => {
-    const parsed = syncBody.safeParse(req.body ?? {});
+  router.post('/sync', async (req, res) => {
+    const parsed = companyBody.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    res.json(store.sync(currentUser(res).id, parsed.data.companyId));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.companyId);
+    res.json(await store.sync(userId, companyId));
   });
 
   /** Record the team's decision on a flagged vendor bill. */
-  router.post('/transactions/:id/review', (req, res) => {
+  router.post('/transactions/:id/review', async (req, res) => {
     const parsed = reviewBody.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    res.json(store.decideReview(currentUser(res).id, parsed.data.companyId, String(req.params.id), parsed.data.decision, parsed.data.note ?? null));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.companyId);
+    res.json(await store.decideReview(userId, companyId, String(req.params.id), parsed.data.decision, parsed.data.note ?? null));
   });
 
   /** Financing offers underwritten from the company's own ledger. */
-  router.get('/loan-offers', (req, res) => {
+  router.get('/loan-offers', async (req, res) => {
     const parsed = companyQuery.safeParse(req.query);
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.company);
     res.set('Cache-Control', 'no-store');
-    res.json(store.loanOffers(currentUser(res).id, parsed.data.company));
+    res.json(await store.loanOffers(userId, companyId));
   });
 
-  router.post('/loan-offers/:id/apply', (req, res) => {
+  router.post('/loan-offers/:id/apply', async (req, res) => {
     const parsed = applyBody.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    res.status(201).json(store.applyForLoan(currentUser(res).id, parsed.data.companyId, String(req.params.id), parsed.data.amount));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.companyId);
+    res.status(201).json(await store.applyForLoan(userId, companyId, String(req.params.id), parsed.data.amount));
   });
 
-  router.post('/loan-offers/:id/save', (req, res) => {
-    const parsed = syncBody.safeParse(req.body ?? {});
+  router.post('/loan-offers/:id/save', async (req, res) => {
+    const parsed = companyBody.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequest(firstIssue(parsed.error));
-    res.json(store.toggleSavedOffer(currentUser(res).id, parsed.data.companyId, String(req.params.id)));
+    const userId = currentUser(res).id;
+    const companyId = await resolveCompany(store, userId, parsed.data.companyId);
+    res.json(await store.toggleSavedOffer(userId, companyId, String(req.params.id)));
   });
 
   return router;

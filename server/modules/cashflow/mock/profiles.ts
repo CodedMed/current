@@ -119,6 +119,7 @@ export const CATEGORIES: CashCategory[] = [
   { id: 'enterprise', name: 'Enterprise', parentId: 'income' },
   { id: 'marketplace', name: 'Marketplace', parentId: 'income' },
   { id: 'interest', name: 'Interest', parentId: 'income' },
+  { id: 'sales', name: 'Sales', parentId: 'income' },
   { id: 'other_income', name: 'Other income', parentId: 'income' },
   { id: 'payroll', name: 'Payroll', parentId: 'expenses' },
   { id: 'contractors', name: 'Contractors', parentId: 'expenses' },
@@ -135,6 +136,14 @@ export const CATEGORIES: CashCategory[] = [
   { id: 'bank_fees', name: 'Bank fees', parentId: 'expenses' },
   { id: 'loan_payments', name: 'Loan payments', parentId: 'expenses' },
   { id: 'utilities', name: 'Utilities', parentId: 'expenses' },
+  { id: 'inventory', name: 'Inventory', parentId: 'expenses' },
+  { id: 'food_beverage', name: 'Food & beverage', parentId: 'expenses' },
+  { id: 'materials', name: 'Materials', parentId: 'expenses' },
+  { id: 'equipment', name: 'Equipment', parentId: 'expenses' },
+  { id: 'supplies', name: 'Supplies & packaging', parentId: 'expenses' },
+  { id: 'fulfillment_shipping', name: 'Fulfillment & shipping', parentId: 'expenses' },
+  { id: 'fleet', name: 'Vehicles & fuel', parentId: 'expenses' },
+  { id: 'owner_draw', name: 'Owner draw', parentId: 'expenses' },
   { id: 'other_expenses', name: 'Other expenses', parentId: 'expenses' },
 ];
 

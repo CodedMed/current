@@ -586,6 +586,6 @@ export function buildDashboard(ledger: Ledger, filters: CashflowFilters, compani
     reviews: reviewQueue(ledger, txns),
     recentTransactions,
     lastSyncedAt,
-    dataSource: { provider: 'mock', label: 'Sample data' },
+    dataSource: { provider: 'mock', mode: 'sandbox', label: 'Sample data' },
   };
 }
