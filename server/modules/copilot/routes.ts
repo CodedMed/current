@@ -106,19 +106,31 @@ function subjectOf(res: Response): string {
   return subject;
 }
 
-/** The fingerprint is only needed server-side for risk scoring; the browser never needs it. */
+/** The hashes are only needed server-side for risk scoring; the browser never needs them. */
 function toPublicInvoice(invoice: LedgerInvoice): CopilotInvoice {
-  const { paymentDestinationFingerprint: _fingerprint, ...rest } = invoice;
+  const { paymentDestinationFingerprint: _fingerprint, invoiceNumberHash: _number, ...rest } = invoice;
   return rest;
 }
 
+/**
+ * History is every other invoice from the same vendor dated on or before the one under review:
+ * later invoices are not "history" for an older one, and same-day entries stay in so a duplicate
+ * can be recognised. Both hashes travel with each entry — the fingerprint feeds the
+ * destination-changed rule, the number hash the duplicate rule.
+ */
 function toHistory(invoice: LedgerInvoice, all: LedgerInvoice[]): HistoricalInvoice[] {
   return all
-    .filter((candidate) => candidate.id !== invoice.id && candidate.vendorKey === invoice.vendorKey)
+    .filter(
+      (candidate) =>
+        candidate.id !== invoice.id &&
+        candidate.vendorKey === invoice.vendorKey &&
+        (candidate.invoiceDate === null || invoice.invoiceDate === null || candidate.invoiceDate <= invoice.invoiceDate),
+    )
     .map((candidate) => ({
       amount: candidate.amount,
       invoiceDate: candidate.invoiceDate,
       paidDate: candidate.paidDate,
+      invoiceNumberHash: candidate.invoiceNumberHash,
       paymentDestinationFingerprint: candidate.paymentDestinationFingerprint,
     }));
 }
@@ -265,6 +277,7 @@ export function createCopilotRouter({ config, ledger, intelligence, identity }: 
         amount: invoice.amount,
         invoiceDate: invoice.invoiceDate,
         dueDate: invoice.dueDate,
+        invoiceNumberHash: invoice.invoiceNumberHash,
         paymentDestinationFingerprint: invoice.paymentDestinationFingerprint,
       },
       toHistory(invoice, all),

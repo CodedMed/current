@@ -24,6 +24,7 @@ class InvoiceUnderReview(_CamelModel):
     amount: Money
     invoice_date: date | None = None
     due_date: date | None = None
+    invoice_number_hash: str | None = None
     payment_destination_fingerprint: str | None = None
 
 
@@ -31,6 +32,7 @@ class HistoricalInvoice(_CamelModel):
     amount: Money
     invoice_date: date | None = None
     paid_date: date | None = None
+    invoice_number_hash: str | None = None
     payment_destination_fingerprint: str | None = None
 
 

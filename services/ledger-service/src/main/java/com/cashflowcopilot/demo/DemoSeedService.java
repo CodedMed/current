@@ -110,8 +110,14 @@ public class DemoSeedService implements ApplicationRunner {
         boolean seededLedger = false;
 
         if (cashEventService.countForUser(user.id()) == 0) {
-            NessieSyncService.SyncResult sync = nessieSyncService.sync(user);
-            bankEvents = sync.insertedEvents();
+            try {
+                NessieSyncService.SyncResult sync = nessieSyncService.sync(user);
+                bankEvents = sync.insertedEvents();
+            } catch (ApiException e) {
+                // A live client pointed at a customer the sandbox does not have must not stop the
+                // demo business from existing; bank data can still be synced later.
+                log.warn("Demo seed: bank sync skipped ({}).", e.getMessage());
+            }
             LedgerCounts counts = seedLedger(user);
             ledgerEvents = counts.events();
             invoices = counts.invoices();
@@ -168,7 +174,7 @@ public class DemoSeedService implements ApplicationRunner {
                     user.id(),
                     node.path("vendorKey").asText(),
                     node.path("vendorDisplayName").asText(),
-                    null,
+                    node.path("invoiceNumberHash").asText(null),
                     node.path("amount").decimalValue(),
                     node.hasNonNull("previousAmount") ? node.path("previousAmount").decimalValue() : null,
                     localDateAt(node, "invoiceDayOffset"),

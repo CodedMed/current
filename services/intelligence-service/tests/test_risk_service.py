@@ -95,3 +95,22 @@ def test_the_endpoint_leaves_ml_score_null_without_enough_history():
 
     assert response.status_code == 200
     assert response.json()["mlScore"] is None
+
+
+def test_missing_ml_extra_degrades_to_rules_instead_of_failing(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def without_ml(name, *args, **kwargs):
+        if name == "numpy" or name == "sklearn" or name.startswith("sklearn."):
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_ml)
+
+    response = _score(invoice("1300"), steady_history(10))
+
+    assert response.ml_score is None
+    assert response.risk_score == pytest.approx(response.rules_score)
+    assert response.severity in {"LOW", "MEDIUM", "HIGH"}

@@ -18,14 +18,18 @@ public class NessieConfig {
         return Clock.systemUTC();
     }
 
-    /** No API key means the demo fixture: the skeleton must run without sponsor credentials. */
+    /**
+     * A key selects the live client; nothing else does. DEMO_MODE governs the auth and
+     * verification bypasses only, so live bank data can be shown alongside the demo sign-in.
+     * No key means the demo fixture: the skeleton must run without sponsor credentials.
+     */
     @Bean
     public NessieClient nessieClient(AppProperties properties, ObjectMapper objectMapper, Clock clock) {
-        if (properties.nessie().hasCredentials() && !properties.demoMode()) {
+        if (properties.nessie().hasCredentials()) {
             log.info("Using live Nessie client");
             return new RealNessieClient(properties.nessie());
         }
-        log.info("Using MockNessieClient (no NESSIE_API_KEY or DEMO_MODE=true)");
+        log.info("Using MockNessieClient (no NESSIE_API_KEY)");
         return new MockNessieClient(objectMapper, clock);
     }
 }

@@ -8,7 +8,7 @@ import httpx
 from pydantic import ValidationError
 
 from app.config import Settings
-from app.documents.schemas import ExtractedInvoice
+from app.documents.schemas import ExtractedInvoice, ModelExtraction, to_extracted
 from app.errors import DOCUMENT_EXTRACTION_FAILED, ApiError
 from app.local_llm.base import extractor_prompt
 
@@ -42,13 +42,14 @@ class OllamaLocalExtractor:
                         "options": {"temperature": 0},
                         "messages": [
                             {"role": "system", "content": extractor_prompt() +
-                             "\nRequired JSON schema:\n" + json.dumps(ExtractedInvoice.model_json_schema(by_alias=True))},
+                             "\nRequired JSON schema:\n" + json.dumps(ModelExtraction.model_json_schema(by_alias=True))},
                             {"role": "user", "content": text},
                         ],
                     },
                 )
                 response.raise_for_status()
-                return ExtractedInvoice.model_validate_json(response.json()["message"]["content"])
+                # The raw invoice number ends here: only its hash is on the returned object.
+                return to_extracted(ModelExtraction.model_validate_json(response.json()["message"]["content"]))
         except (httpx.ConnectError, httpx.TimeoutException):
             raise LocalModelUnavailable() from None
         except (httpx.HTTPError, ValidationError, ValueError, KeyError, TypeError):

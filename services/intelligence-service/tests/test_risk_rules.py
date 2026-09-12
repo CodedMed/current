@@ -91,3 +91,22 @@ def test_no_reason_describes_the_invoice_as_fraud():
 
     assert reasons
     assert not any("fraud" in reason.lower() for reason in reasons)
+
+
+def test_a_repeated_invoice_number_is_a_duplicate_even_when_the_amount_changed():
+    same_number = "sha256:" + "c" * 64
+    history = [historical("1000", days_ago=30, number_hash=same_number)]
+
+    total, reasons = rules.score(invoice("1000.01", days_ago=2, number_hash=same_number), history)
+
+    assert total == pytest.approx(WEIGHTS["duplicate_invoice"])
+    assert reasons == ["This invoice number has already been recorded for this vendor"]
+
+
+def test_different_invoice_numbers_are_not_duplicates_on_amount_alone():
+    history = [historical("1000", days_ago=30, number_hash="sha256:" + "a" * 64)]
+
+    total, reasons = rules.score(invoice("1000", days_ago=30, number_hash="sha256:" + "b" * 64), history)
+
+    assert "duplicate" not in " ".join(reasons).lower()
+    assert total == 0.0

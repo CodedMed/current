@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
+from app.documents.privacy import invoice_number_hash
 from app.documents.schemas import ExtractedInvoice
 
 
@@ -27,7 +28,12 @@ class MockLocalExtractor:
             recurring=True,
             category="cloud_services",
             confidence=0.96,
+            # The demo invoice's printed reference, so uploading it twice reads as a duplicate.
+            invoice_number_hash=invoice_number_hash("CP-2026-0061"),
+            # The suspicious sample's remit-to details, as samples/invoices/generate.py prints them —
+            # different from the seeded history's, so "payment details changed" fires in demo mode
+            # exactly as it does for a live extraction of that PDF.
             payment_destination_fingerprint=(
-                "sha256:" + "a" * 64
+                "sha256:d531f97a977931c2a348eb0466d1cd6d7b59f026247e6ef24c6d57d9747a89d8"
             ),
         )

@@ -9,6 +9,10 @@ Needs the ``ml`` extra (scikit-learn).
 
 from __future__ import annotations
 
+import logging
+
+log = logging.getLogger(__name__)
+
 MODEL_VERSION = "invoice-risk-v1"
 RULES_WEIGHT = 0.60
 ML_WEIGHT = 0.40
@@ -18,14 +22,35 @@ _RANDOM_STATE = 7
 _TREES = 200
 
 
-def anomaly_percentile(features: dict[str, float], history_features: list[dict[str, float]]) -> float:
-    """Share of the vendor's own history that looks more ordinary than this invoice."""
+def ml_available() -> bool:
+    """True when the ``ml`` extra (numpy, scikit-learn) is importable."""
+    try:
+        import numpy  # noqa: F401
+        import sklearn.ensemble  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def anomaly_percentile(
+    features: dict[str, float], history_features: list[dict[str, float]]
+) -> float | None:
+    """Share of the vendor's own history that looks more ordinary than this invoice.
+
+    Returns ``None`` when the model cannot run because the ``ml`` extra is not installed, so the
+    caller falls back to the rules score instead of failing the request. A missing dependency is a
+    deployment gap worth a warning, not a reason to leave an invoice unscored.
+    """
     if len(history_features) < MINIMUM_REFERENCE_INVOICES:
         return 0.0
 
     # Imported lazily so the rules-only path still works when the ml extra is not installed.
-    import numpy as np
-    from sklearn.ensemble import IsolationForest
+    try:
+        import numpy as np
+        from sklearn.ensemble import IsolationForest
+    except ImportError:
+        log.warning("Isolation Forest unavailable: install the 'ml' extra. Scoring on rules alone.")
+        return None
 
     columns = sorted(features)
     reference = np.array(

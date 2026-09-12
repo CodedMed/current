@@ -156,3 +156,16 @@ def test_unavailable_ollama_falls_back_only_in_demo(monkeypatch, demo_mode):
     else:
         with pytest.raises(LocalModelUnavailable):
             run(service.extract("invoice.pdf", "application/pdf", SAMPLE.read_bytes()))
+
+
+def test_the_invoice_number_leaves_only_as_a_hash():
+    from app.documents.privacy import invoice_number_hash
+    from app.documents.schemas import ModelExtraction, to_extracted
+
+    model = ModelExtraction.model_validate({**VALID, "invoiceNumber": "CP-2026-0061"})
+    extracted = to_extracted(model)
+
+    assert extracted.invoice_number_hash == invoice_number_hash("cp 2026 0061")  # canonicalised
+    assert "CP-2026-0061" not in extracted.model_dump_json(by_alias=True)
+    assert "invoiceNumber\"" not in extracted.model_dump_json(by_alias=True)
+    assert invoice_number_hash(None) is None and invoice_number_hash("--") is None

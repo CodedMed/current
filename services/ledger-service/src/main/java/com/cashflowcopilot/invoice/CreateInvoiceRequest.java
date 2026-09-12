@@ -16,5 +16,7 @@ public record CreateInvoiceRequest(
         @NotBlank @Size(max = 100) @Pattern(regexp = "^[a-z][a-z0-9_]*$") String category,
         @Pattern(regexp = "OUT") String direction,
         @NotNull @DecimalMin("0") @DecimalMax("1") Double confidence,
+        /** Local hash of the invoice's printed reference; the number itself is never sent. */
+        @Pattern(regexp = "^sha256:[a-f0-9]{64}$") String invoiceNumberHash,
         @Pattern(regexp = "^sha256:[a-f0-9]{64}$") String paymentDestinationFingerprint
 ) {}

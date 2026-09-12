@@ -6,7 +6,7 @@ clamped to [0, 1]. These rules are deterministic on purpose: no model decides th
 
 from __future__ import annotations
 
-from app.risk.features import build_features
+from app.risk.features import build_features, duplicate_kind
 from app.risk.schemas import HistoricalInvoice, InvoiceUnderReview
 
 WEIGHTS = {
@@ -36,12 +36,12 @@ def score(invoice: InvoiceUnderReview, history: list[HistoricalInvoice]) -> tupl
         )
 
     if features["duplicate_invoice_flag"]:
-        triggered.append(
-            (
-                "duplicate_invoice",
-                "This vendor already has an invoice for the same amount on the same date",
-            )
+        reason = (
+            "This invoice number has already been recorded for this vendor"
+            if duplicate_kind(invoice, history) == "number"
+            else "This vendor already has an invoice for the same amount on the same date"
         )
+        triggered.append(("duplicate_invoice", reason))
 
     price_change = features["price_change_pct"]
     if price_change > PRICE_INCREASE_THRESHOLD:

@@ -188,6 +188,8 @@ export interface ExtractedInvoice {
   category: string;
   direction: 'OUT';
   confidence: number;
+  /** Local SHA-256 of the printed invoice reference; the number itself never leaves the extractor. */
+  invoiceNumberHash: string | null;
   paymentDestinationFingerprint: string | null;
 }
 

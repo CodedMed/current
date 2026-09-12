@@ -1,6 +1,20 @@
-"""Derive an optional payment fingerprint locally, without retaining identifiers."""
+"""Derive optional fingerprints locally, without retaining identifiers."""
 import hashlib
 import re
+
+
+def invoice_number_hash(number: str | None) -> str | None:
+    """Stable identity for an invoice reference, so a re-issued or re-uploaded invoice can be
+    recognised as a duplicate without the number itself ever being stored or transmitted.
+
+    Canonicalised to upper-case alphanumerics first ("CP-2026-0061", "cp 2026 0061" and
+    "CP2026-0061" are the same invoice)."""
+    if not number:
+        return None
+    canonical = re.sub(r"[^A-Z0-9]", "", number.upper())
+    if len(canonical) < 3:
+        return None
+    return "sha256:" + hashlib.sha256(f"invoice-number|{canonical}".encode()).hexdigest()
 
 
 def payment_fingerprint(text: str) -> str | None:
