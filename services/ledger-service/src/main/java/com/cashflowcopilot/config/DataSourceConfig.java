@@ -32,12 +32,18 @@ public class DataSourceConfig {
         }
         JdbcCoordinates coordinates = JdbcCoordinates.parse(databaseUrl);
         log.info("Connecting to configured database {}", coordinates.jdbcUrl());
-        return DataSourceBuilder.create()
+        HikariDataSource dataSource = DataSourceBuilder.create()
                 .type(HikariDataSource.class)
                 .url(coordinates.jdbcUrl())
                 .username(coordinates.username())
                 .password(coordinates.password())
                 .build();
+        // Hikari waits 30 s by default before giving up on a connection. With the database down
+        // that turns every /health probe into a 30 s stall, which is worse than the outage itself.
+        // Five seconds covers a TLS handshake to hosted Tiger Data with room to spare.
+        dataSource.setConnectionTimeout(5_000);
+        dataSource.setValidationTimeout(2_000);
+        return dataSource;
     }
 
     @Bean(destroyMethod = "close")

@@ -54,7 +54,11 @@ whole narrative on the seeded demo business. The ledger refuses that call outsid
 `cash_events` is the spine: every ingest path — bank sync, uploaded document, manual entry,
 system obligation — normalizes into the same record, and every projection reads from it. On a
 Timescale deployment it becomes a hypertable partitioned on `event_time`; on plain PostgreSQL the
-migration skips that step and everything else is unchanged.
+migration skips that step and everything else is unchanged. A second Flyway location,
+`db/timescale`, is appended at startup only when the extension is present; it holds the chunk
+sizing, the compression policy and the `cash_daily` continuous aggregate, none of which can be
+guarded inline. `scripts/db.sh up` gives a local TimescaleDB for that path — see
+[tigerdata.md](tigerdata.md).
 
 Statuses drive behaviour rather than convention: `ACTUAL` is settled money, `EXPECTED` and
 `OVERDUE` shape the projection, `CANCELLED` is ignored everywhere.

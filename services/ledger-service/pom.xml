@@ -77,6 +77,12 @@
 				<directory>${project.basedir}/../../db/migrations</directory>
 				<targetPath>db/migration</targetPath>
 			</resource>
+			<!-- Tiger Data only. Added to spring.flyway.locations at runtime by
+			     TimescaleFlywayConfig when the timescaledb extension is present. -->
+			<resource>
+				<directory>${project.basedir}/../../db/timescale</directory>
+				<targetPath>db/timescale</targetPath>
+			</resource>
 			<!-- Demo seed fixtures live in the monorepo root `samples/seed`. -->
 			<resource>
 				<directory>${project.basedir}/../../samples/seed</directory>

@@ -12,6 +12,9 @@
 services:
   db:
     image: timescale/timescaledb:latest-pg16
+    # Survive a Docker engine restart (Desktop updates do this without warning). Without a policy
+    # the database stays down while the ledger service keeps running against nothing.
+    restart: unless-stopped
     environment:
       POSTGRES_USER: copilot
       POSTGRES_PASSWORD: copilot
