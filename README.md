@@ -112,19 +112,29 @@ Browser ──► Express /api/copilot/* ──► services/ledger-service      
 
 ```bash
 npm run dev:all                                  # or: npm run dev + npm run dev:services
-# Real database (Tiger Data / TimescaleDB or PostgreSQL):
-DATABASE_URL=postgresql://copilot:copilot@localhost:5432/copilot npm run dev:ledger
+# Real, persistent database (TimescaleDB in Docker, wrapped by scripts/db.sh):
+scripts/db.sh up                                 # starts TimescaleDB and waits until healthy
+DATABASE_URL=$(scripts/db.sh url) npm run dev:ledger
+scripts/db.sh status                             # extension, hypertable, aggregate, policies, /health
 # Or the containerised stack (db + both services), with the web app on the host:
 docker compose -f docker-compose.dev.yml up --build && npm run dev
 ```
 
-Adding a key is what switches a capability from mock to real; there is no other flag. `NESSIE_API_KEY` (plus `DEMO_MODE=false`) for live bank data in the ledger, `OLLAMA_MODEL` (after `ollama pull llama3.2`, see [docs/local-ai.md](docs/local-ai.md)) for real extraction, `GEMINI_API_KEY` for the advisor, `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` for voice. Keep `INTERNAL_SERVICE_TOKEN` identical everywhere; the `npm run dev:*` scripts load the repo `.env` for the services so that happens by itself.
+With the `timescaledb` extension present the ledger does three extra things: `cash_events` becomes
+a hypertable, a second Flyway stream (`db/timescale`) adds chunk sizing, compression and the
+`cash_daily` continuous aggregate, and `GET /v1/analytics/spend` (burn rate, runway, category
+movers) is served from that rollup instead of scanning rows. Without the extension everything
+degrades to the equivalent portable query. `GET :8080/health` reports which mode is live — and
+whether the database answers at all. `scripts/db.sh reset` drops the volume for a clean re-seed.
+See [docs/tigerdata.md](docs/tigerdata.md).
+
+Adding a key is what switches a capability from mock to real; there is no other flag. `NESSIE_API_KEY` for live bank data in the ledger (in any `DEMO_MODE`; the BFF passes the customer it provisioned), `OLLAMA_MODEL` (after `ollama pull llama3.2`, see [docs/local-ai.md](docs/local-ai.md)) for real extraction, `GEMINI_API_KEY` for the advisor, `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` for voice. Keep `INTERNAL_SERVICE_TOKEN` identical everywhere; the `npm run dev:*` scripts load the repo `.env` for the services so that happens by itself.
 
 ### Demo walkthrough
 
 1. Sign in and complete verification (sandbox: **Simulate approval**).
 2. `GET /api/copilot/dashboard` — available cash, 30-day inflow/outflow, the first projected gap, overdue receivables, and priority tasks from the seeded business.
-3. `POST /api/copilot/documents` with `samples/invoices/suspicious_vendor_invoice.pdf` (`api.copilot.uploadDocument` in the client streams the stages: extracting locally → validating → scoring → saved). The invoice is persisted, an expected outflow enters the ledger, and the risk engine flags it **HIGH**: 30% above the vendor's previous charge, payment details changed, off the usual cadence.
+3. `POST /api/copilot/documents` with `samples/invoices/suspicious_vendor_invoice.pdf` (regenerate the sample PDFs relative to today first with `services/intelligence-service/.venv/bin/python samples/invoices/generate.py`) (`api.copilot.uploadDocument` in the client streams the stages: extracting locally → validating → scoring → saved). The invoice is persisted, an expected outflow enters the ledger, and the risk engine flags it **HIGH**: 30% above the vendor's previous charge, payment details changed, off the usual cadence. Upload it a second time and the duplicate is called out by invoice number — only a local hash of the number is ever kept.
 4. The forecast worsens: expected outflow rises by the invoice amount and the gap moves.
 5. Open **Advisor** (`/advisor`) and ask "What should I do first?" — or `POST /api/copilot/advisor` `{ "message": "What should I do first?", "language": "en" }`. The advisor explains the position, connects the overdue $4,000 to the projected gap and ranks actions; `language: "es"` answers in Spanish, and `POST /api/copilot/voice/session` reports whether voice is available.
 6. `POST /api/copilot/todos` turns a proposed action into a `PROPOSED` task; `PATCH` approves, starts, or completes it. Nothing executes automatically.
