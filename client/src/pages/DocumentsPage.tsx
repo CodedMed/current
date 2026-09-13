@@ -37,6 +37,9 @@ export default function DocumentsPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedDocumentResult | null>(null);
   const [scoringId, setScoringId] = useState<string | null>(null);
+  /** How many invoices the automatic check is working through, 0 when it is not running. */
+  const [checking, setChecking] = useState(0);
+  const backfilled = useRef(false);
   const [scoreError, setScoreError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestVersion = useRef(0);
@@ -62,6 +65,36 @@ export default function DocumentsPage() {
     void refresh(controller.signal);
     return () => controller.abort();
   }, [refresh]);
+
+  /**
+   * Every invoice gets checked, without being asked. Invoices arrive unscored from the bank feed
+   * and from the vendor history, and an unchecked invoice is the one a bad charge hides in — so
+   * the page scores them itself the first time it sees any, then reloads to show the verdicts.
+   */
+  useEffect(() => {
+    if (invoices === null || backfilled.current) return;
+    const pending = invoices.filter((invoice) => invoice.riskScore === null).length;
+    if (pending === 0) return;
+    backfilled.current = true;
+
+    const controller = new AbortController();
+    setChecking(pending);
+    void (async () => {
+      try {
+        const result = await api.copilot.backfillRisk(controller.signal);
+        if (controller.signal.aborted) return;
+        if (result.scored > 0) await refresh(controller.signal);
+        // More than one request may score: keep going until nothing is left unchecked.
+        if (result.remaining > 0) backfilled.current = false;
+      } catch {
+        // Leave them unchecked and let the per-row control stand; this is not worth an error.
+        backfilled.current = false;
+      } finally {
+        if (!controller.signal.aborted) setChecking(0);
+      }
+    })();
+    return () => controller.abort();
+  }, [invoices, refresh]);
 
   const selectFile = (files: FileList | null) => {
     if (uploadLock.current || !files?.length) return;
@@ -168,20 +201,21 @@ export default function DocumentsPage() {
 
       <section className="overflow-hidden rounded-2xl bg-panel shadow-card ring-1 ring-ink/5" aria-labelledby="invoices-heading">
         <div className="flex flex-wrap items-center gap-3 border-b border-line p-5 sm:px-6">
-          <div className="mr-auto"><h2 id="invoices-heading" className="text-base font-semibold text-ink">Invoice history {invoices && <span className="ml-1 text-sm font-normal text-ink-muted">{invoices.length}</span>}</h2><p className="mt-0.5 text-xs text-ink-muted">Risk scores describe unusual patterns, not proof of fraud.</p></div>
+          <div className="mr-auto"><h2 id="invoices-heading" className="text-base font-semibold text-ink">Invoice history {invoices && <span className="ml-1 text-sm font-normal text-ink-muted">{invoices.length}</span>}</h2><p className="mt-0.5 text-xs text-ink-muted">Every invoice is checked automatically. Risk scores describe unusual patterns, not proof of fraud.</p></div>
+          {checking > 0 && <span className="flex items-center gap-2 text-xs font-medium text-brand-700" role="status"><Spinner className="size-3.5" />Checking {checking} invoice{checking === 1 ? '' : 's'} for risk…</span>}
           <div className="relative w-full sm:w-64"><Search className="absolute top-3 left-3 size-4 text-ink-muted" aria-hidden="true" /><input aria-label="Search invoices" placeholder="Search vendor, status, risk…" value={query} onChange={(event) => setQuery(event.target.value)} className={cn(inputClass, 'pl-9')} /></div>
           <Button variant="secondary" size="sm" loading={loading} onClick={() => void refresh()} icon={<RefreshCw className="size-4" aria-hidden="true" />}>Refresh</Button>
         </div>
         {listError && <Alert tone="danger" className="m-5" action={<Button size="sm" variant="secondary" onClick={() => void refresh()}>Retry loading invoices</Button>}>{listError}</Alert>}
         {scoreError && <Alert tone="danger" className="m-5">{scoreError}</Alert>}
-        {loading && !invoices ? <p className="flex items-center justify-center gap-2 p-12 text-sm text-ink-muted" role="status"><Spinner className="size-4" />Loading invoices…</p> : invoices && visible.length === 0 ? <p className="p-12 text-center text-sm text-ink-muted">{query ? 'No invoices match your search.' : 'No invoices yet. Upload your first vendor invoice above.'}</p> : invoices && <div className="overflow-x-auto"><table className="w-full min-w-[840px] text-left text-sm"><thead className="bg-surface/70 text-xs font-semibold text-ink-muted"><tr>{['Vendor', 'Amount', 'Due', 'Status', 'Risk', 'Reason', ''].map((heading) => <th key={heading} scope="col" className="px-5 py-3">{heading}</th>)}</tr></thead><tbody className="divide-y divide-line">{visible.map((invoice) => <tr key={invoice.id} id={`invoice-${invoice.id}`} className="scroll-mt-6 align-top">
+        {loading && !invoices ? <p className="flex items-center justify-center gap-2 p-12 text-sm text-ink-muted" role="status"><Spinner className="size-4" />Loading invoices…</p> : invoices && visible.length === 0 ? <p className="p-12 text-center text-sm text-ink-muted">{query ? 'No invoices match your search.' : 'No invoices yet. Upload your first vendor invoice above.'}</p> : invoices && <div className="overflow-x-auto"><table className="w-full min-w-[840px] text-left text-sm"><thead className="bg-surface/70 text-xs font-semibold text-ink-muted"><tr>{['Vendor', 'Amount', 'Due', 'Status', 'Risk', 'Reason', ''].map((heading) => <th key={heading} scope="col" className="px-5 py-3">{heading}</th>)}</tr></thead><tbody className="divide-y divide-line">{visible.map((invoice) => <tr key={invoice.id} id={`invoice-${invoice.id}`} className="scroll-mt-[calc(var(--workspace-header,9rem)+1rem)] align-top">
           <td className="max-w-48 px-5 py-4"><p className="break-words font-semibold text-ink">{invoice.vendorDisplayName ?? titleCase(invoice.vendorKey)}</p><p className="mt-1 text-xs text-ink-muted">{invoice.recurring ? 'Recurring' : titleCase(invoice.source)}</p></td>
           <td className="whitespace-nowrap px-5 py-4 tabular font-semibold text-ink">{money(invoice.amount, { cents: true })}</td>
           <td className="whitespace-nowrap px-5 py-4 text-ink-secondary">{invoice.dueDate ? mediumDate(invoice.dueDate) : 'Not provided'}</td>
           <td className="px-5 py-4"><Badge tone={invoice.status === 'OVERDUE' ? 'danger' : invoice.status === 'PAID' ? 'success' : 'neutral'}>{titleCase(invoice.status)}</Badge></td>
-          <td className="px-5 py-4">{invoice.riskSeverity ? <><Badge tone={invoice.riskSeverity === 'HIGH' ? 'danger' : invoice.riskSeverity === 'MEDIUM' ? 'warning' : 'success'}>{titleCase(invoice.riskSeverity)}</Badge><p className="mt-1 text-xs text-ink-muted">{Math.round((invoice.riskScore ?? 0) * 100)}/100 anomaly score</p></> : <Badge tone="neutral">Not checked</Badge>}</td>
+          <td className="px-5 py-4">{invoice.riskSeverity ? <><Badge tone={invoice.riskSeverity === 'HIGH' ? 'danger' : invoice.riskSeverity === 'MEDIUM' ? 'warning' : 'success'}>{titleCase(invoice.riskSeverity)}</Badge><p className="mt-1 text-xs text-ink-muted">{Math.round((invoice.riskScore ?? 0) * 100)}/100 anomaly score</p></> : checking > 0 ? <span className="flex items-center gap-1.5 text-xs text-ink-muted"><Spinner className="size-3" />Checking…</span> : <Badge tone="neutral">Not checked</Badge>}</td>
           <td className="max-w-80 min-w-48 px-5 py-4 text-xs leading-relaxed text-ink-secondary">{invoice.riskReasons.length ? <ul className="space-y-1">{invoice.riskReasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul> : invoice.riskScore !== null ? 'No unusual patterns detected.' : 'Run a risk check to compare this invoice with its vendor history.'}</td>
-          <td className="px-5 py-4"><Button size="sm" variant="secondary" loading={scoringId === invoice.id} disabled={loading || uploading || (scoringId !== null && scoringId !== invoice.id)} onClick={() => void score(invoice)} aria-label={`${invoice.riskScore === null ? 'Check' : 'Recheck'} risk for ${invoice.vendorDisplayName ?? invoice.vendorKey}`}>{invoice.riskScore === null ? 'Check risk' : 'Recheck'}</Button></td>
+          <td className="px-5 py-4"><Button size="sm" variant="secondary" loading={scoringId === invoice.id} disabled={loading || uploading || checking > 0 || (scoringId !== null && scoringId !== invoice.id)} onClick={() => void score(invoice)} aria-label={`Recheck risk for ${invoice.vendorDisplayName ?? invoice.vendorKey}`}>Recheck</Button></td>
         </tr>)}</tbody></table></div>}
       </section>
     </CopilotPageShell>

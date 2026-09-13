@@ -20,7 +20,7 @@ export function OutlookPanel({ runway, cashPosition, today }: OutlookPanelProps)
   const runsOut = runway.months !== null ? new Date(new Date(`${today}T00:00:00Z`).getTime() + runway.months * 30.4 * 86_400_000).toISOString().slice(0, 10) : null;
 
   return (
-    <section id="forecast" className="flex min-w-0 flex-col rounded-2xl bg-panel shadow-card ring-1 ring-ink/5 scroll-mt-52 lg:scroll-mt-36" aria-label="Runway and forecast">
+    <section className="flex min-w-0 flex-col rounded-2xl bg-panel shadow-card ring-1 ring-ink/5" aria-label="Runway and forecast">
       <div className="px-5 pt-5 sm:px-6 sm:pt-6">
         <h2 className="text-[15px] font-semibold text-ink">Cash runway</h2>
         <p className="mt-0.5 text-sm text-ink-muted">Based on the last {runway.basisMonths} full months</p>

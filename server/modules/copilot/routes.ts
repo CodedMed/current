@@ -10,11 +10,13 @@ import {
   type CopilotMe,
   type DocumentUploadEvent,
   type InvoiceRiskResult,
+  type RiskBackfillResult,
   type SavedDocumentResult,
 } from '../../../shared/copilot.ts';
 import type { AppConfig } from '../../config.ts';
 import { HttpError, badRequest, notFound } from '../../lib/errors.ts';
 import { currentUser, requireUser, requireVerified } from '../../lib/guards.ts';
+import { mapWithConcurrency } from '../../lib/http.ts';
 import { createLogger } from '../../lib/logger.ts';
 import type { CopilotIdentityBridge } from './identityBridge.ts';
 import type { HistoricalInvoice, IntelligenceClient } from './intelligenceClient.ts';
@@ -97,6 +99,10 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   if (!parsed.success) throw badRequest(firstIssue(parsed.error));
   return parsed.data;
 }
+
+/** Invoices one backfill request will score, and how many at a time. */
+const RISK_BACKFILL_LIMIT = 150;
+const RISK_BACKFILL_CONCURRENCY = 4;
 
 /* ───────────────────────── Helpers ───────────────────────── */
 
@@ -307,6 +313,37 @@ export function createCopilotRouter({ config, ledger, intelligence, identity }: 
     await ledger.storeRiskResult(subject, invoice.id, risk);
     return risk;
   }
+
+  /**
+   * Scores every invoice that has never been scored.
+   *
+   * Risk checking is not something an owner should have to ask for one invoice at a time — the
+   * bank feed and the seeded vendor history both arrive unscored, and an unchecked invoice is
+   * exactly the one a fraudulent charge hides in. The work is bounded per request and each
+   * invoice is scored independently, so one failure does not lose the rest.
+   */
+  router.post('/invoices/risk/backfill', async (_req, res) => {
+    const subject = subjectOf(res);
+    const all = await ledger.invoices(subject);
+    const unscored = all.filter((invoice) => invoice.riskScore === null);
+    const batch = unscored.slice(0, RISK_BACKFILL_LIMIT);
+
+    const outcomes = await mapWithConcurrency(batch, RISK_BACKFILL_CONCURRENCY, async (invoice) => {
+      try {
+        await scoreAndStore(subject, invoice, all);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    const scored = outcomes.filter(Boolean).length;
+    res.json({
+      scored,
+      failed: outcomes.length - scored,
+      remaining: Math.max(0, unscored.length - batch.length),
+    } satisfies RiskBackfillResult);
+  });
 
   router.post('/invoices/:id/risk', async (req, res) => {
     const subject = subjectOf(res);

@@ -1,6 +1,6 @@
 import { CalendarDays, Check, Plus, TrendingUp, X } from 'lucide-react';
 import { Link } from 'react-router';
-import type { ProposedAction, TodoPriority } from '../../../../shared/copilot.ts';
+import type { AdvisorLanguage, ProposedAction, TodoPriority } from '../../../../shared/copilot.ts';
 import { cn } from '../../lib/cn.ts';
 import { mediumDate, money } from '../../lib/format.ts';
 import type { AdvisorStrings } from '../../lib/advisor/strings.ts';
@@ -20,7 +20,7 @@ interface RecommendationCardProps {
   index: number;
   status: RecommendationStatus;
   strings: AdvisorStrings;
-  language: 'en' | 'es';
+  language: AdvisorLanguage;
   onAdd: () => void;
   onDismiss: () => void;
   onUndo: () => void;
@@ -47,7 +47,7 @@ export function RecommendationCard({ action, index, status, strings, language, o
           <span className="mr-1.5 text-ink-muted">{index + 1}.</span>
           {action.title}
         </p>
-        <Badge tone={PRIORITY_TONE[action.priority]}>{PRIORITY_LABEL[language][action.priority]}</Badge>
+        <Badge tone={PRIORITY_TONE[action.priority]}>{(PRIORITY_LABEL[language === 'es' ? 'es' : 'en'] as Record<TodoPriority, string>)[action.priority]}</Badge>
       </div>
       <p className="mt-1 text-sm leading-relaxed text-ink-secondary">{action.rationale}</p>
       {(action.dueDate || action.estimatedImpact !== null) && (

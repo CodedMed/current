@@ -17,10 +17,10 @@ Fixed in the codebase, with tests (`npm test` 37/37, `npm run test:ledger` 66/66
   points at 8001. Express probes both services at startup and `GET /api/copilot/health` reports
   `ok: false` with the offending service name when a different application answers on a URL.
 - **D3 (data)** — One bank feed. `NessieCashflowStore` hands every fresh Nessie snapshot to the
-  copilot bridge, which pushes it when it changed; the advisor's figures and the Keel dashboard's
+  copilot bridge, which pushes it when it changed; the advisor's figures and the current.surf dashboard's
   figures now come from the same records. Demo seeding for a workspace user adds only the vendor
   invoice history (`POST /v1/demo/seed { "includeBankData": false }`), never the fixture business.
-  The Keel dashboard's own analytics still live in Express (option C in §6 remains future work).
+  The current.surf dashboard's own analytics still live in Express (option C in §6 remains future work).
 - **D6** — The bridge checks the ledger's view on every prepared request and re-mirrors,
   re-pushes and re-seeds when the ledger has lost the user.
 - **D7** — `npm run test:ledger` pins `NESSIE_API_KEY` and `DATABASE_URL` empty.
@@ -28,9 +28,43 @@ Fixed in the codebase, with tests (`npm test` 37/37, `npm run test:ledger` 66/66
   withdrawals with categories, recurring bills rolling to their next occurrence, internal
   transfers skipped (`NessieNormalizer`, `CategoryMapper`).
 
-Still open: D3 (UI: the documents, invoices and tasks pages and the copilot panels), D4, D5, D8,
+Still open: D3 (UI: the documents, invoices and tasks pages and the copilot panels), D4, D8,
 D9, D10 (analytics route), and M1–M10. The phases below are unchanged except that Phase 0 and
 Phase 1 are done.
+
+## 0a. Status after the accessibility pass (2026-09-13)
+
+`npm test` 57/57, pytest 125/125, typecheck clean. `npm run test:ledger` could not be run on this
+machine: the embedded PostgreSQL that the Java suite starts fails at `initdb` with
+`could not create shared memory segment: Cannot allocate memory`, which is macOS's default SysV
+shared-memory limits (`kern.sysv.shmmni=32`, `shmseg=8`), not a code change — no Java file was
+touched in this pass.
+
+- **D5 — fixed.** `ADVISOR_LANGUAGES` in `shared/copilot.ts` is now the 13 languages the
+  ElevenLabs agent speaks, with a `LANGUAGES` table carrying each one's native name and writing
+  direction, and `.env.example` defaults `SUPPORTED_LANGUAGES` to the same list. A French question
+  now reaches Gemini as French. The advisor's own hand-written `STRINGS` still cover en/es and
+  fall back to English for the rest (`stringsFor`, `suggestionsFor`), which the interface
+  translator then translates.
+- **Interface translation — new.** `POST /api/i18n/translate` (Express, open to signed-out
+  visitors, rate limited) over a new Python `TranslationService`, which batches 50 strings a call
+  to Gemini, caches per language for the life of the process, and leaves a string untranslated
+  rather than failing. The browser side (`client/src/lib/i18n/translator.ts`) walks the rendered
+  DOM, swaps text and `placeholder`/`title`/`aria-label`/`alt`, keeps each node's source text so
+  English is restored exactly, re-applies from cache through a `MutationObserver` when React
+  re-renders, and remembers strings that came back untranslated so they are never requested twice.
+  It covers text this codebase never wrote — category names, merchant names, advisor answers,
+  task titles. `LanguageSwitcher` sits in all four headers; Arabic sets `dir="rtl"`.
+- **Voice everywhere — new.** `VoiceDock` puts the advisor's microphone on every workspace page
+  (hidden on `/advisor`, which owns its own session), with the orb, mute, the last question and
+  the answer, and a link into the full advisor.
+- **Persona sessions** — a stored inquiry id Persona has never seen (a sandbox id left over from
+  before a real key) now starts a new inquiry instead of failing verification with a 404.
+
+Known limits of the translation layer: the first switch to a language costs one Gemini round trip
+per ~50 new strings; right-to-left languages set `dir` but the layout still uses physical
+`ml-*`/`text-left` utilities, so Arabic reads correctly but is not mirrored; and a `<title>` or
+anything outside `document.body` is not translated.
 
 ## 1. How this was checked
 
@@ -62,7 +96,7 @@ with enforced transitions).
 Two things keep it from being the product the spec describes:
 
 1. **The browser cannot reach most of it.** There is no documents page, no invoices page and no
-   tasks page, and the dashboard the user sees is a separate Express-computed "Keel" dashboard
+   tasks page, and the dashboard the user sees is a separate Express-computed "current.surf" dashboard
    that never reads the ledger. Steps 3–8 and 12 of the demo narrative only work with `curl`.
 2. **In the configuration actually on this machine it is broken twice over.** With a live
    `NESSIE_API_KEY` the ledger reports **$0 available cash** for the demo business, and the BFF
@@ -76,7 +110,7 @@ Two things keep it from being the product the spec describes:
 | Persona gate (live, sandbox, webhook, mirrored to Java) | ✓ | ✓ | ✓ `/verify` | Works |
 | Nessie → `cash_events` | ✓ fixture · ✗ live client | ✓ | ✗ nothing calls sync | **Broken with a live key** (D1) |
 | Deterministic forecast + first gap | ✓ | ✓ | ✗ only the advisor side panel | Backend only |
-| Dashboard read model (`/v1/dashboard`) | ✓ | ✓ | ✗ page uses the Keel API instead | **Not as intended** (D3) |
+| Dashboard read model (`/v1/dashboard`) | ✓ | ✓ | ✗ page uses the current.surf API instead | **Not as intended** (D3) |
 | Document upload → local extraction | ✓ | ✓ NDJSON stages | ✗ no `/documents` page | Backend only (M1) |
 | Invoice persistence + risk result | ✓ | ✓ | ✗ no `/invoices` page | Backend only (M2) |
 | Advisor (text, Gemini, mock fallback) | ✓ verified live | ✓ | ✓ `/advisor` | Works |
@@ -150,12 +184,12 @@ Only `NessieNormalizer.fromBill` (at sync time) and `InvoiceService.create` (at 
 receivable (due in 19 days) will still read "expected, due in 0 days" three weeks from now and
 never enter the overdue list or the advisor's follow-up ranking. **Fix.** Phase 3.
 
-### D5 · Languages are not configuration-driven end to end — **medium**
+### D5 · Languages are not configuration-driven end to end — **medium** — fixed 2026-09-13
 
-`SUPPORTED_LANGUAGES=en,es,fr,de,…` in `.env` is honoured by Python (the voice session lists 13
-languages), but `server/modules/copilot/routes.ts:40` clamps the language to
+`SUPPORTED_LANGUAGES=en,es,fr,de,…` in `.env` was honoured by Python (the voice session lists 13
+languages), but `server/modules/copilot/routes.ts:40` clamped the language to
 `ADVISOR_LANGUAGES = ['en','es']` with `.catch('en')`, and the client selector and `STRINGS` only
-know en/es. A French question silently becomes English. **Fix.** Phase 4.
+knew en/es. A French question silently became English. **Fixed:** see §0a.
 
 ### D6 · Identity-bridge caches go stale after a ledger restart — **medium (default demo path)**
 
@@ -224,8 +258,8 @@ Three ways to make the dashboard and the advisor agree:
 - **B. Fix the Java pull client and, in sandbox mode, expose Express's in-memory Nessie twin over
   HTTP as a stand-in.** More moving parts; keep the pull-client fix anyway for standalone
   deployments of the ledger.
-- **C. Rebuild the Keel dashboard on ledger reads.** The spec-pure end state (no financial logic
-  in Express), but the Keel dashboard's scenarios, breakdowns, bill review and financing are large
+- **C. Rebuild the current.surf dashboard on ledger reads.** The spec-pure end state (no financial logic
+  in Express), but the current.surf dashboard's scenarios, breakdowns, bill review and financing are large
   and out of the spec's scope. Do this after the demo, module by module.
 
 Plan below assumes **A**, with the pull client repaired as a fallback.
@@ -253,10 +287,10 @@ Acceptance: `npm run test:all` is green (53/53 Java); `GET /api/copilot/health` 
 | 1.3 | Extend `NessieNormalizer`: deposit `completed` → IN/ACTUAL; deposit `pending` → IN/EXPECTED receivable (`counterpartyLabel` from the description, OVERDUE when dated in the past); withdrawal `completed` → OUT/ACTUAL with a deterministic category mapper (port `withdrawalCategory`/`billCategory` from `nessieLedger.ts`); purchase by status (`cancelled` → CANCELLED) with merchant name/category; bill `pending`/`recurring` → OUT/EXPECTED or OVERDUE; internal transfers (`Transfer ·` prefix) skipped. Unit-test each. | `nessie/NessieNormalizer.java`, tests |
 | 1.4 | `NessieSyncService.currentCash` / `accounts` read `bank_accounts` (checking + savings; cards excluded) and only fall back to the client when the table is empty and a live key exists. | `nessie/NessieSyncService.java` |
 | 1.5 | Repair the pull path for standalone deployments: snake_case field names, `LocalDate` parsing, `status`, `getWithdrawals`, `getTransfers`, `getMerchant`, empty-list on 404. | `nessie/RealNessieClient.java`, `NessieClient.java`, `MockNessieClient.java`, `dto/NessieDtos.java` |
-| 1.6 | BFF: `LedgerClient.pushBankSnapshot(subject, snapshot)`; call it when `Provisioner#run` completes (inject a completion hook), from `POST /api/cashflow/sync`, and from `CopilotIdentityBridge.prepare` when the ledger's `lastSyncedAt` is null. Demo seeding: seed the fixture business only for users **without** a workspace; a Keel user gets their own workspace pushed instead, so the $8,000 fixture never contradicts their dashboard. | `server/modules/copilot/ledgerClient.ts`, `identityBridge.ts`, `server/modules/nessie/provisioner.ts`, `server/services.ts` |
+| 1.6 | BFF: `LedgerClient.pushBankSnapshot(subject, snapshot)`; call it when `Provisioner#run` completes (inject a completion hook), from `POST /api/cashflow/sync`, and from `CopilotIdentityBridge.prepare` when the ledger's `lastSyncedAt` is null. Demo seeding: seed the fixture business only for users **without** a workspace; a current.surf user gets their own workspace pushed instead, so the $8,000 fixture never contradicts their dashboard. | `server/modules/copilot/ledgerClient.ts`, `identityBridge.ts`, `server/modules/nessie/provisioner.ts`, `server/services.ts` |
 | 1.7 | Tests: normalizer per record type; BFF test that provisioning pushes once and sync pushes again; ledger test that `currentCash` equals the pushed checking + savings balances. | as above |
 
-Acceptance: after onboarding, `/api/copilot/dashboard.totals.availableCash` equals the Keel
+Acceptance: after onboarding, `/api/copilot/dashboard.totals.availableCash` equals the current.surf
 `kpis.totalCash.book` (cards excluded) and the same upcoming bills appear in both.
 
 ### Phase 2 — Put the copilot in the browser (delivers M1–M4; fixes D3-UI) (≈ 1.5 days)
@@ -267,7 +301,7 @@ Acceptance: after onboarding, `/api/copilot/dashboard.totals.availableCash` equa
 | 2.2 | `DocumentsPage`: dropzone (PDF/PNG/JPEG ≤ 10 MB); stage list driven by `uploadCopilotDocument` events (Uploading → Extracting locally → Validating → Scoring → Saved); result card with extracted fields, risk chip + reasons, and the forecast delta (gap before vs after, using the returned `forecast`); a warnings banner (demo extraction); privacy line "Processed locally; the raw document is never sent to Gemini or ElevenLabs"; links to the invoice. Handle `DOCUMENT_UNSUPPORTED`, `DUPLICATE_INVOICE` (Phase 3) and retryable errors. | `client/src/pages/DocumentsPage.tsx`, `components/documents/*`, `lib/documents/uploadState.ts` (+ test) |
 | 2.3 | `InvoicesPage`: table Vendor · Amount · Invoice date · Due · Status · Risk · Reasons; row actions **Score** (`POST /invoices/:id/risk`), **Mark paid** / **Cancel** (Phase 3); upload CTA; severity colours. | `client/src/pages/InvoicesPage.tsx`, `components/invoices/*` |
 | 2.4 | `TasksPage`: tabs Proposed / Active / Completed / Declined; cards with source badge (ADVISOR, RISK, FORECAST, MANUAL); actions by status (Approve/Decline, Start/Complete, Delete); "Add task" form (title, description, priority, due date → `MANUAL`, `APPROVED`). | `client/src/pages/TasksPage.tsx`, `components/tasks/*`, `lib/tasks/transitions.ts` (+ test) |
-| 2.5 | Dashboard "Copilot" section fed by `api.copilot.dashboard`: four tiles (Available cash, 30-day inflow, 30-day outflow, Projected gap with date and amount or "none in 60 days"); `HighRiskInvoices`, `PriorityTasks` (approve inline), `OverdueReceivables`, `AdvisorQuickAsk` (navigates to `/advisor` with the question prefilled). Mark the gap on the Keel cash-position chart. | `client/src/pages/DashboardPage.tsx`, `components/copilot/*` |
+| 2.5 | Dashboard "Copilot" section fed by `api.copilot.dashboard`: four tiles (Available cash, 30-day inflow, 30-day outflow, Projected gap with date and amount or "none in 60 days"); `HighRiskInvoices`, `PriorityTasks` (approve inline), `OverdueReceivables`, `AdvisorQuickAsk` (navigates to `/advisor` with the question prefilled). Mark the gap on the current.surf cash-position chart. | `client/src/pages/DashboardPage.tsx`, `components/copilot/*` |
 | 2.6 | Client unit tests for the pure helpers (upload stage reducer, task transitions, forecast delta). | `client/src/lib/**/*.test.ts` |
 
 Acceptance: the 12-step demo narrative (spec §32) runs entirely in the browser.
@@ -317,7 +351,7 @@ Acceptance: the 12-step demo narrative (spec §32) runs entirely in the browser.
   approve → onboarding → copilot tiles visible → upload suspicious PDF → HIGH risk → gap moves →
   advisor answer → add task → task visible. Node smoke test of the BFF documents route against a
   stub intelligence server.
-- **Later (option C):** move the Keel dashboard's analytics, bill review and financing onto ledger
+- **Later (option C):** move the current.surf dashboard's analytics, bill review and financing onto ledger
   reads so Express computes no money at all.
 
 ## 8. Verification runbook
@@ -327,7 +361,7 @@ Run after each phase; all of it after Phase 2.
 1. `npm run test:all` green; `npm run typecheck` clean.
 2. `GET /api/copilot/health`: both `ok`, correct service names, `adapters` as expected.
 3. Sign in, simulate approval, finish onboarding. Dashboard copilot tiles show the same available
-   cash as the Keel KPI strip; `SnapshotPanel` on `/advisor` agrees.
+   cash as the current.surf KPI strip; `SnapshotPanel` on `/advisor` agrees.
 4. `/documents`: upload `samples/invoices/suspicious_vendor_invoice.pdf` (regenerate with
    `samples/invoices/generate.py` first). Stages stream; result shows HIGH with "30% above",
    "payment details changed", "off the usual schedule"; the forecast delta shows the gap moving

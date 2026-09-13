@@ -9,8 +9,15 @@ interface VoiceOrbProps {
   /** Receives `--level` (0–1) from the live microphone / playback volume; drives the bars and the core scale. */
   levelRef?: RefObject<HTMLDivElement | null>;
   reducedMotion?: boolean;
+  /** `sm` is the docked orb that sits beside text; `lg` is the advisor page's centrepiece. */
+  size?: 'sm' | 'lg';
   className?: string;
 }
+
+const SIZES = {
+  sm: { root: 'size-16', core: 'size-11', ring: 'inset-1', icon: 'size-5' },
+  lg: { root: 'size-44', core: 'size-28', ring: 'inset-3', icon: 'size-9' },
+} as const;
 
 const CORE: Record<VoiceState, string> = {
   idle: 'bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-[0_18px_40px_-18px_rgb(59_111_240/0.7)]',
@@ -38,16 +45,17 @@ const RING: Record<VoiceState, string> = {
  * breathes when idle. Motion is driven by CSS keyframes (paused by the global reduced-motion
  * rule) plus a `--level` variable fed from the SDK's live volume, never by timers guessing state.
  */
-export function VoiceOrb({ state, label, levelRef, reducedMotion = false, className }: VoiceOrbProps) {
+export function VoiceOrb({ state, label, levelRef, reducedMotion = false, size = 'lg', className }: VoiceOrbProps) {
   const animated = !reducedMotion;
+  const scale = SIZES[size];
   const rings = animated && (state === 'listening' || state === 'speaking') ? [0, 1, 2] : [];
   return (
-    <div ref={levelRef} data-state={state} role="img" aria-label={label} className={cn('relative grid size-44 place-items-center', className)} style={{ ['--level' as string]: 0 }}>
+    <div ref={levelRef} data-state={state} role="img" aria-label={label} className={cn('relative grid place-items-center', scale.root, className)} style={{ ['--level' as string]: 0 }}>
       {rings.map((i) => (
         <span
           key={i}
           aria-hidden="true"
-          className={cn('absolute inset-3 rounded-full border-2 animate-orb-ring', RING[state])}
+          className={cn('absolute rounded-full border-2 animate-orb-ring', scale.ring, RING[state])}
           style={{ animationDelay: `${i * 0.85}s`, animationDuration: state === 'speaking' ? '2.1s' : '2.8s' }}
         />
       ))}
@@ -67,7 +75,8 @@ export function VoiceOrb({ state, label, levelRef, reducedMotion = false, classN
       <div
         aria-hidden="true"
         className={cn(
-          'relative grid size-28 place-items-center rounded-full transition-[background-color,box-shadow,color] duration-500',
+          'relative grid place-items-center rounded-full transition-[background-color,box-shadow,color] duration-500',
+          scale.core,
           CORE[state],
           animated && state === 'idle' && 'animate-orb-breathe',
         )}
@@ -78,11 +87,11 @@ export function VoiceOrb({ state, label, levelRef, reducedMotion = false, classN
         ) : state === 'thinking' ? (
           <Dots animated={animated} />
         ) : state === 'error' ? (
-          <CircleAlert className="size-9" />
+          <CircleAlert className={scale.icon} />
         ) : state === 'unavailable' ? (
-          <MicOff className="size-9" />
+          <MicOff className={scale.icon} />
         ) : (
-          <Mic className="size-9" />
+          <Mic className={scale.icon} />
         )}
       </div>
     </div>

@@ -201,7 +201,7 @@ export default function VerifyIdentityPage() {
       step="verify"
       eyebrow="Step 2 · Identity"
       title="Verify your identity"
-      description="Financial regulations require us to confirm who you are before your business can move money through Keel. It takes about two minutes."
+      description="Financial regulations require us to confirm who you are before your business can move money through current.surf. It takes about two minutes."
     >
       <Card className="relative overflow-hidden">
         <div className="mb-5 flex items-center justify-between gap-3">
@@ -234,7 +234,7 @@ export default function VerifyIdentityPage() {
             ) : (
               <SandboxPanel busy={busy} onChoose={(o) => void simulate(o)} />
             )}
-            <p className="text-center text-xs text-ink-muted">Your documents go directly to Persona. Keel only receives the result.</p>
+            <p className="text-center text-xs text-ink-muted">Your documents go directly to Persona. current.surf only receives the result.</p>
           </div>
         )}
 
@@ -290,12 +290,12 @@ export default function VerifyIdentityPage() {
 
         {phase === 'declined' && (
           <Alert tone="danger" title="We couldn't verify your identity">
-            Based on the information provided, we are unable to open a Keel account right now.
+            Based on the information provided, we are unable to open a current.surf account right now.
             {message && <p className="mt-2 text-xs opacity-80">{message}</p>}
             <p className="mt-2">
               If you believe this is a mistake, contact{' '}
-              <a href="mailto:support@keel.app" className="font-semibold underline underline-offset-2">
-                support@keel.app
+              <a href="mailto:support@current.surf" className="font-semibold underline underline-offset-2">
+                support@current.surf
               </a>
               .
             </p>

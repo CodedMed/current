@@ -38,6 +38,8 @@ import type {
   DocumentUploadStage,
   InvoiceRiskResult,
   ManualCashEventInput,
+  RiskBackfillResult,
+  TranslateResponse,
   NessieSyncResult,
   SavedDocumentResult,
   UpdateTodoInput,
@@ -102,7 +104,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
-    throw new ApiError(0, 'network', 'We could not reach Keel. Check your connection and try again.');
+    throw new ApiError(0, 'network', 'We could not reach current.surf. Check your connection and try again.');
   }
 
   const text = await res.text();
@@ -138,7 +140,7 @@ export async function uploadCopilotDocument(file: File, onStage?: (stage: Docume
   try {
     res = await fetch('/api/copilot/documents', { method: 'POST', body: form, headers: { Accept: 'application/x-ndjson' }, credentials: 'same-origin' });
   } catch {
-    throw new ApiError(0, 'network', 'We could not reach Keel. Check your connection and try again.');
+    throw new ApiError(0, 'network', 'We could not reach current.surf. Check your connection and try again.');
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
@@ -192,6 +194,12 @@ export async function uploadCopilotDocument(file: File, onStage?: (stage: Docume
 export const api = {
   session: (signal?: AbortSignal) => request<SessionResponse>('/api/session', { signal }),
   logout: () => request<SessionResponse>('/api/auth/logout', { method: 'POST' }),
+
+  /** Interface translation. Open to signed-out visitors so sign-up and verification translate too. */
+  i18n: {
+    translate: (language: AdvisorLanguage, strings: string[], signal?: AbortSignal) =>
+      request<TranslateResponse>('/api/i18n/translate', { method: 'POST', body: { language, strings }, signal }),
+  },
 
   identity: {
     start: () => request<IdentitySessionResponse>('/api/identity/session', { method: 'POST' }),
@@ -276,6 +284,8 @@ export const api = {
     invoice: (id: string) => request<CopilotInvoice>(`/api/copilot/invoices/${encodeURIComponent(id)}`),
     /** Scores the invoice against its vendor history and stores the result. */
     scoreInvoice: (id: string) => request<InvoiceRiskResult>(`/api/copilot/invoices/${encodeURIComponent(id)}/risk`, { method: 'POST' }),
+    /** Scores every invoice that has never been scored, so risk checking is not a per-row chore. */
+    backfillRisk: (signal?: AbortSignal) => request<RiskBackfillResult>('/api/copilot/invoices/risk/backfill', { method: 'POST', signal }),
     uploadDocument: uploadCopilotDocument,
 
     /** Text advisor. The financial context is fetched server-side; only the question and prior turns travel. */

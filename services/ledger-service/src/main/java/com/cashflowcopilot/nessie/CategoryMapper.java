@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Deterministic category and counterparty rules for bank records. Mirrors the rules the Keel
+ * Deterministic category and counterparty rules for bank records. Mirrors the rules the current.surf
  * dashboard applies in {@code server/modules/cashflow/nessie/nessieLedger.ts} so both views of the
  * same bank feed agree on what a movement was for. Output is always a snake_case category id.
  */

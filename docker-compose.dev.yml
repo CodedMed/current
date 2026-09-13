@@ -1,5 +1,5 @@
 # Local development stack for the Cash Flow Copilot backend: a Tiger Data / TimescaleDB database
-# plus the two backend services. The Keel web app (Express API + Vite client) runs on the host
+# plus the two backend services. The current.surf web app (Express API + Vite client) runs on the host
 # with `npm run dev`, and Ollama is expected on the host too, which is the simplest Mac setup.
 #
 #   cp .env.example .env

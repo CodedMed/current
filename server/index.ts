@@ -13,7 +13,7 @@ const app = createApp(services);
 const server = app.listen(config.port, () => {
   const mode = (m: 'live' | 'sandbox') => (m === 'live' ? 'LIVE   ' : 'SANDBOX');
   const { integrations } = services.config;
-  log.info(`Keel API listening on http://localhost:${config.port} (${config.env})`);
+  log.info(`current.surf API listening on http://localhost:${config.port} (${config.env})`);
   log.info(`  Google sign-in  ${mode(integrations.google)}`);
   log.info(`  Persona KYC/AML ${services.identityBypassed ? 'BYPASS ' : mode(integrations.persona)}`);
   log.info(`  Nessie banking  ${mode(integrations.nessie)}`);

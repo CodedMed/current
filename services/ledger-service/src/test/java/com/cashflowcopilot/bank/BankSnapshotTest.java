@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * The BFF pushes the workspace's bank snapshot; the ledger becomes the same business the Keel
+ * The BFF pushes the workspace's bank snapshot; the ledger becomes the same business the current.surf
  * dashboard shows, and available cash comes from the ingested balances rather than a live call.
  */
 @SpringBootTest(properties = {"app.demo-mode=true", "app.database-url=", "app.internal-service-token=bank-test"})
@@ -47,7 +47,7 @@ class BankSnapshotTest {
         return LocalDate.now(ZoneOffset.UTC).plusDays(offset).toString();
     }
 
-    /** Two accounts, five money movements, an internal transfer and two bills: the Keel workspace in miniature. */
+    /** Two accounts, five money movements, an internal transfer and two bills: the current.surf workspace in miniature. */
     static String workspaceSnapshot(String customerId) {
         return """
                 {

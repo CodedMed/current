@@ -15,7 +15,7 @@ interface PanelProps {
 /** Section chrome shared by every dashboard module. */
 export function Panel({ id, title, subtitle, aside, footer, children, className, bodyClassName }: PanelProps) {
   return (
-    <section id={id} className={cn('flex min-w-0 flex-col rounded-2xl bg-panel shadow-card ring-1 ring-ink/5 scroll-mt-52 lg:scroll-mt-36', className)} aria-label={title}>
+    <section id={id} className={cn('flex min-w-0 flex-col rounded-2xl bg-panel shadow-card ring-1 ring-ink/5', className)} aria-label={title}>
       <header className="flex items-start justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold text-ink">{title}</h2>

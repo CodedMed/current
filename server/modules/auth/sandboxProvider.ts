@@ -30,7 +30,7 @@ export class SandboxAuthProvider implements AuthProvider {
     return {
       provider: 'google',
       subject: `sandbox-${suffix}`,
-      email: `owner+${suffix}@sandbox.keel.app`,
+      email: `owner+${suffix}@sandbox.current.surf`,
       emailVerified: true,
       name: 'Jordan Rivera',
       givenName: 'Jordan',

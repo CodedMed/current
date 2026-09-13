@@ -94,7 +94,7 @@ export function todoFromAction(action: ProposedAction, origin: ActionOrigin): Cr
   };
 }
 
-export const SUGGESTED_QUESTIONS: Record<AdvisorLanguage, readonly string[]> = {
+export const SUGGESTED_QUESTIONS: Record<'en' | 'es', readonly string[]> = {
   en: [
     'How is my business doing financially?',
     'How much cash do I have available?',
@@ -115,4 +115,9 @@ export const SUGGESTED_QUESTIONS: Record<AdvisorLanguage, readonly string[]> = {
 
 export function newMessageId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Starter questions for a language, falling back to the English the translator works from. */
+export function suggestionsFor(language: AdvisorLanguage): readonly string[] {
+  return language === 'es' ? SUGGESTED_QUESTIONS.es : SUGGESTED_QUESTIONS.en;
 }

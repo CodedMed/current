@@ -50,7 +50,7 @@ export default function SignUpPage() {
   return (
     <OnboardingShell
       step="signup"
-      eyebrow="Welcome to Keel"
+      eyebrow="Welcome to current.surf"
       title="Create your account"
       description="Start with the sign-in you already use. Identity verification and workspace setup take about five minutes."
     >
@@ -98,7 +98,7 @@ export default function SignUpPage() {
       </div>
 
       <p className="animate-fade-up stagger-5 mt-8 text-center text-xs leading-relaxed text-ink-muted">
-        By continuing you agree to Keel's{' '}
+        By continuing you agree to current.surf's{' '}
         <a href="#" className="font-medium text-ink-secondary underline decoration-line underline-offset-2 hover:text-ink">
           Terms of Service
         </a>{' '}

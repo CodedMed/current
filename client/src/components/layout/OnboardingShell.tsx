@@ -5,6 +5,7 @@ import type { FlowStep } from '../../../../shared/flow.ts';
 import { cn } from '../../lib/cn.ts';
 import { initials } from '../../lib/format.ts';
 import { useSession } from '../../lib/session.tsx';
+import { LanguageSwitcher } from '../ui/LanguageSwitcher.tsx';
 import { Logo } from '../ui/Logo.tsx';
 import { Stepper } from './Stepper.tsx';
 
@@ -21,7 +22,7 @@ interface OnboardingShellProps {
 const RAIL_COPY: Record<FlowStep, { heading: string; body: string }> = {
   signup: {
     heading: 'Know where every dollar stands.',
-    body: 'Keel brings income, bills, invoices, and forecasts into one calm view, so decisions are made with the numbers in front of you.',
+    body: 'current.surf brings income, bills, invoices, and forecasts into one calm view, so decisions are made with the numbers in front of you.',
   },
   verify: {
     heading: 'Trusted by banks, built for you.',
@@ -108,6 +109,7 @@ export function OnboardingShell({ step, eyebrow, title, description, children, f
           <span className="hidden lg:block" />
           {user ? (
             <div className="flex items-center gap-3">
+              <LanguageSwitcher />
               <span className="hidden items-center gap-2 sm:flex">
                 {user.picture ? (
                   <img src={user.picture} alt="" className="size-8 rounded-full ring-1 ring-ink/10" referrerPolicy="no-referrer" />
@@ -129,7 +131,10 @@ export function OnboardingShell({ step, eyebrow, title, description, children, f
               </button>
             </div>
           ) : (
-            <span className="hidden text-sm text-ink-muted sm:inline">Cash-flow management for small business</span>
+            <div className="flex items-center gap-3">
+              <span className="hidden text-sm text-ink-muted sm:inline">Cash-flow management for small business</span>
+              <LanguageSwitcher />
+            </div>
           )}
         </header>
 

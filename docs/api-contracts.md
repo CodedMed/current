@@ -81,6 +81,18 @@ starts (an unsupported type, say) use normal HTTP error responses.
 
 ---
 
+## Interface translation (Express, `/api/i18n`)
+
+| Method | Path | Calls |
+| --- | --- | --- |
+| POST | `/api/i18n/translate` | intelligence `POST /v1/i18n/translate` |
+
+**Deliberately open to signed-out visitors.** Sign-up and identity verification are the pages a
+person who does not read English most needs translated, and they are reached before a session
+exists. The cost is bounded three ways: at most 200 strings of at most 600 characters each, 60
+requests per IP per minute, and `language: "en"` is answered in Express without a round trip at
+all. A language outside `ADVISOR_LANGUAGES` is a 400.
+
 ## Ledger service (Java, `http://localhost:8080`)
 
 Every `/v1/**` endpoint requires the internal token. Every endpoint except `/v1/me` and the
@@ -113,7 +125,7 @@ Persona routes additionally requires `persona_status = 'approved'`.
 
 The workspace as the BFF fetched it from Nessie, with merchant names resolved. Calendar dates;
 card balances positive (the amount owed), which the ledger signs so `totalBalance` matches the
-Keel dashboard's total cash.
+current.surf dashboard's total cash.
 
 ```json
 {
@@ -313,7 +325,7 @@ only; they become tasks (`POST /v1/todos`, source `ADVISOR`) only when the owner
 
 ### `POST /v1/voice/session`
 
-Request `{ "language": "en" | "es" }`. With credentials:
+Request `{ "language": "<BCP-47 code>" }`, one of `SUPPORTED_LANGUAGES`. With credentials:
 
 ```json
 { "available": true, "mode": "voice", "language": "es", "signedUrl": "wss://…", "agentId": "agent_…", "supportedLanguages": ["en", "es"], "clientToolName": "ask_cash_flow_advisor" }
@@ -322,3 +334,29 @@ Request `{ "language": "en" | "es" }`. With credentials:
 Without them `{ "available": false, "mode": "text", "language", "supportedLanguages", "reason" }`.
 The browser registers `clientToolName` with the ElevenLabs client; the agent must expose a client
 tool of that name with a `question` parameter. The API key never appears in the response.
+
+### `POST /v1/i18n/translate`
+
+Request `{ "language": "<BCP-47 code>", "strings": ["Available cash", "Add task"] }` (at most 200).
+
+```json
+{ "language": "es", "provider": "gemini", "translations": { "Available cash": "Efectivo disponible", "Add task": "Agregar tarea" } }
+```
+
+Rules that matter to the caller:
+
+- **A string may be missing from `translations`.** That is not an error — it means the model did
+  not return one, and the caller keeps the source text. The web app remembers which strings came
+  back missing so it never asks a second time.
+- **`provider` is `none`** when nothing was translated: `language` is `en`, or `GEMINI_API_KEY` is
+  not set. The interface then stays English and says so, rather than blanking out.
+- **`language` is clamped** to `SUPPORTED_LANGUAGES`, falling back to the first entry.
+- Translations are cached per language for the life of the process, so a repeated string costs
+  nothing. The web app asks only for strings its pre-built pack does not already cover
+  (`client/public/i18n/<lang>.json`), so in practice this endpoint sees the user's own data —
+  merchant names, categories, advisor answers — rather than the interface. Product names (current.surf, Persona, Gemini, Nessie, ElevenLabs, Capital One) are preserved
+  verbatim, and figures, dates and currency symbols are never reformatted.
+
+### `GET /v1/i18n/languages`
+
+`{ "languages": [{ "code": "es", "name": "Spanish" }, …] }` — what this service will translate into.

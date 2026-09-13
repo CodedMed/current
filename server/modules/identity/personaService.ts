@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IdentitySessionResponse, IdentityStatus } from '../../../shared/types.ts';
 import { IDENTITY_STATUSES } from '../../../shared/types.ts';
 import type { PersonaConfig } from '../../config.ts';
-import { badRequest, forbidden } from '../../lib/errors.ts';
+import { badRequest, forbidden, IntegrationError } from '../../lib/errors.ts';
 import { createLogger } from '../../lib/logger.ts';
 import type { UserRecord, UserRepository } from '../../store/userStore.ts';
 import { isIdentityVerified } from '../../flow.ts';
@@ -58,24 +58,24 @@ export class PersonaIdentityService implements IdentityService {
 
   async #startSession(user: UserRecord): Promise<Omit<IdentitySessionResponse, 'nextStep'>> {
     const existingId = user.identity.inquiryId;
+    const existing = existingId ? await this.#findInquiry(existingId) : null;
 
-    if (existingId) {
-      const inquiry = await this.#client.getInquiry(existingId);
-      const outcome = outcomeFromInquiry(inquiry);
+    if (existing) {
+      const outcome = outcomeFromInquiry(existing);
       await this.#record(user, outcome);
 
       if (isIdentityVerified(outcome.status, this.#config.acceptCompleted)) {
-        return { mode: 'live', status: outcome.status, inquiryId: existingId, sessionToken: null };
+        return { mode: 'live', status: outcome.status, inquiryId: existing.id, sessionToken: null };
       }
       if (RESUMABLE.has(outcome.status)) {
-        const resumed = await this.#client.resumeInquiry(existingId);
-        return { mode: 'live', status: toIdentityStatus(resumed.inquiry.attributes.status), inquiryId: existingId, sessionToken: resumed.sessionToken };
+        const resumed = await this.#client.resumeInquiry(existing.id);
+        return { mode: 'live', status: toIdentityStatus(resumed.inquiry.attributes.status), inquiryId: existing.id, sessionToken: resumed.sessionToken };
       }
       if (!RETRYABLE.has(outcome.status)) {
         // declined / needs_review / completed-awaiting-decision: nothing to open.
-        return { mode: 'live', status: outcome.status, inquiryId: existingId, sessionToken: null };
+        return { mode: 'live', status: outcome.status, inquiryId: existing.id, sessionToken: null };
       }
-      log.info('Previous inquiry failed; creating a new one', { userId: user.id, inquiryId: existingId });
+      log.info('Previous inquiry failed; creating a new one', { userId: user.id, inquiryId: existing.id });
     }
 
     const created = await this.#client.createInquiry({
@@ -110,10 +110,32 @@ export class PersonaIdentityService implements IdentityService {
   async refresh(user: UserRecord): Promise<IdentityOutcome> {
     const inquiryId = user.identity.inquiryId;
     if (!inquiryId) return { status: 'not_started', inquiryId: null, detail: null };
-    const inquiry = await this.#client.getInquiry(inquiryId);
+    const inquiry = await this.#findInquiry(inquiryId);
+    if (!inquiry) {
+      const forgotten: IdentityOutcome = { status: 'not_started', inquiryId: null, detail: null };
+      await this.#record(user, forgotten);
+      return forgotten;
+    }
     const outcome = outcomeFromInquiry(inquiry);
     await this.#record(user, outcome);
     return outcome;
+  }
+
+  /**
+   * Reads an inquiry, treating "no such record" as absent rather than as a failure. A stored
+   * id can predate the current Persona key — a sandbox id, or one from another Persona
+   * account — and the only way forward from there is a fresh inquiry.
+   */
+  async #findInquiry(inquiryId: string): Promise<PersonaInquiry | null> {
+    try {
+      return await this.#client.getInquiry(inquiryId);
+    } catch (err) {
+      if (err instanceof IntegrationError && err.upstreamStatus === 404) {
+        log.info('Stored inquiry is unknown to Persona; starting a new one', { inquiryId });
+        return null;
+      }
+      throw err;
+    }
   }
 
   async handleWebhook(rawBody: Buffer, signatureHeader: string | undefined): Promise<string | null> {

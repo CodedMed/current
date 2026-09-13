@@ -71,7 +71,12 @@ export interface AdvisorStrings {
   micUnmute: string;
 }
 
-export const STRINGS: Record<AdvisorLanguage, AdvisorStrings> = {
+/**
+ * Hand-written for the two languages the advisor shipped with. Every other language falls back
+ * to English here and is translated at runtime by the interface translator, so the menu never
+ * offers a language the page cannot actually render.
+ */
+export const STRINGS: Record<'en' | 'es', AdvisorStrings> = {
   en: {
     title: 'Advisor',
     tagline: 'Cash-flow answers from your own ledger',
@@ -81,7 +86,7 @@ export const STRINGS: Record<AdvisorLanguage, AdvisorStrings> = {
     dashboard: 'Dashboard',
     signOut: 'Sign out',
     emptyTitle: 'Ask about your cash position',
-    emptyBody: 'Every answer is grounded in the balances, expected payments, obligations and forecast Keel already computed for your business. Recommendations stay proposals until you add them to your tasks.',
+    emptyBody: 'Every answer is grounded in the balances, expected payments, obligations and forecast current.surf already computed for your business. Recommendations stay proposals until you add them to your tasks.',
     suggestions: 'Try one of these',
     placeholder: 'Ask about cash, upcoming payments, overdue invoices, or what to do first…',
     voicePlaceholder: 'Type to the voice advisor, or just speak…',
@@ -122,7 +127,7 @@ export const STRINGS: Record<AdvisorLanguage, AdvisorStrings> = {
     tryAgain: 'Try again',
     switchToText: 'Switch to text',
     voiceUnavailableTitle: 'Voice is not available',
-    voiceHow: 'ElevenLabs handles speech and turn-taking. Every answer is computed by the Keel advisor from your ledger, the same as in text mode.',
+    voiceHow: 'ElevenLabs handles speech and turn-taking. Every answer is computed by the current.surf advisor from your ledger, the same as in text mode.',
     voicePrivacy: 'Only your microphone audio and the advisor’s answers reach the voice service. No documents or account details ever do.',
     voiceTyped: 'Sent to the voice advisor',
     snapshotTitle: 'Your numbers',
@@ -153,7 +158,7 @@ export const STRINGS: Record<AdvisorLanguage, AdvisorStrings> = {
     dashboard: 'Panel',
     signOut: 'Cerrar sesión',
     emptyTitle: 'Pregunta sobre tu posición de efectivo',
-    emptyBody: 'Cada respuesta se basa en los saldos, pagos esperados, obligaciones y pronóstico que Keel ya calculó para tu negocio. Las recomendaciones son propuestas hasta que las añadas a tus tareas.',
+    emptyBody: 'Cada respuesta se basa en los saldos, pagos esperados, obligaciones y pronóstico que current.surf ya calculó para tu negocio. Las recomendaciones son propuestas hasta que las añadas a tus tareas.',
     suggestions: 'Prueba con una de estas',
     placeholder: 'Pregunta sobre efectivo, pagos próximos, facturas vencidas o qué hacer primero…',
     voicePlaceholder: 'Escribe al asesor de voz, o simplemente habla…',
@@ -194,7 +199,7 @@ export const STRINGS: Record<AdvisorLanguage, AdvisorStrings> = {
     tryAgain: 'Intentar de nuevo',
     switchToText: 'Cambiar a texto',
     voiceUnavailableTitle: 'La voz no está disponible',
-    voiceHow: 'ElevenLabs gestiona el habla y los turnos. Cada respuesta la calcula el asesor de Keel a partir de tu libro mayor, igual que en modo texto.',
+    voiceHow: 'ElevenLabs gestiona el habla y los turnos. Cada respuesta la calcula el asesor de current.surf a partir de tu libro mayor, igual que en modo texto.',
     voicePrivacy: 'Solo el audio de tu micrófono y las respuestas del asesor llegan al servicio de voz. Nunca documentos ni datos de cuentas.',
     voiceTyped: 'Enviado al asesor de voz',
     snapshotTitle: 'Tus cifras',
@@ -217,3 +222,8 @@ export const STRINGS: Record<AdvisorLanguage, AdvisorStrings> = {
     micUnmute: 'Activar micrófono',
   },
 };
+
+/** The advisor's own copy for a language, or the English it is translated from. */
+export function stringsFor(language: AdvisorLanguage): AdvisorStrings {
+  return language === 'es' ? STRINGS.es : STRINGS.en;
+}

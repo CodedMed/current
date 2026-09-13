@@ -1,4 +1,4 @@
-import type { AdvisorContext, AdvisorReply, AdvisorTurn, ExtractionResult, InvoiceRiskResult, VoiceSession } from '../../../shared/copilot.ts';
+import type { AdvisorContext, AdvisorReply, AdvisorTurn, ExtractionResult, InvoiceRiskResult, TranslateResponse, VoiceSession } from '../../../shared/copilot.ts';
 import type { CopilotConfig } from '../../config.ts';
 import { callUpstream, type UpstreamRequest } from './upstream.ts';
 
@@ -70,6 +70,14 @@ export class IntelligenceClient {
   /** `history` is continuity only (the last few turns); the facts are always the fresh ledger context. */
   advise(message: string, language: string, context: AdvisorContext, history: AdvisorTurn[] = []): Promise<AdvisorReply> {
     return this.#call({ method: 'POST', path: '/v1/advisor/chat', json: { message, language, history, context }, timeoutMs: 90_000 });
+  }
+
+  /**
+   * Interface translation. Strings the model could not translate are absent from the result,
+   * and the caller keeps the English source for those.
+   */
+  translate(language: string, strings: string[]): Promise<TranslateResponse> {
+    return this.#call({ method: 'POST', path: '/v1/i18n/translate', json: { language, strings }, timeoutMs: 60_000 });
   }
 
   voiceSession(language: string): Promise<VoiceSession> {

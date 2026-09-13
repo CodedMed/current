@@ -1,7 +1,7 @@
 {
   "name": "cashflow-onboarding",
   "version": "1.0.0",
-  "description": "Keel — sign-up, identity verification, onboarding, and the Cash Flow Copilot backend (ledger, documents, invoice risk, advisor) for small-business cash-flow management",
+  "description": "current.surf \u2014 sign-up, identity verification, onboarding, and the Cash Flow Copilot backend (ledger, documents, invoice risk, advisor) for small-business cash-flow management",
   "scripts": {
     "dev": "concurrently -k -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "node --watch --env-file-if-exists=.env server/index.ts",
@@ -11,6 +11,7 @@
     "dev:services": "concurrently -k -n ledger,intel -c yellow,green \"npm:dev:ledger\" \"npm:dev:intelligence\"",
     "dev:all": "concurrently -k -n server,client,ledger,intel -c blue,magenta,yellow,green \"npm:dev:server\" \"npm:dev:client\" \"npm:dev:ledger\" \"npm:dev:intelligence\"",
     "setup:intelligence": "cd services/intelligence-service && python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e '.[documents,ml,ai,dev]'",
+    "build:i18n": "node scripts/build-i18n-packs.mjs",
     "build": "vite build",
     "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.ts",
     "typecheck": "tsc -p tsconfig.server.json && tsc -p tsconfig.client.json",
@@ -49,6 +50,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
+    "happy-dom": "^20.14.5",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"

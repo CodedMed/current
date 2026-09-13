@@ -12,23 +12,12 @@ import { VoicePanel } from '../components/advisor/VoicePanel.tsx';
 import { useReducedMotion } from '../hooks/useReducedMotion.ts';
 import { useVoiceAdvisor } from '../hooks/useVoiceAdvisor.ts';
 import { ApiError, api } from '../lib/api.ts';
-import { SUGGESTED_QUESTIONS, actionKey, newMessageId, toHistory, todoFromAction, type AdvisorMessage, type ConversationMessage } from '../lib/advisor/conversation.ts';
-import { STRINGS } from '../lib/advisor/strings.ts';
+import { actionKey, newMessageId, suggestionsFor, toHistory, todoFromAction, type AdvisorMessage, type ConversationMessage } from '../lib/advisor/conversation.ts';
+import { STRINGS, stringsFor } from '../lib/advisor/strings.ts';
 import { isVoiceActive } from '../lib/advisor/voiceState.ts';
 import { cn } from '../lib/cn.ts';
+import { useLanguage } from '../lib/i18n/LanguageProvider.tsx';
 import { useSession } from '../lib/session.tsx';
-
-const LANGUAGE_KEY = 'keel.advisor.language';
-
-function initialLanguage(): AdvisorLanguage {
-  try {
-    const saved = window.localStorage.getItem(LANGUAGE_KEY);
-    if (saved === 'en' || saved === 'es') return saved;
-  } catch {
-    // Storage may be unavailable; English is the default either way.
-  }
-  return 'en';
-}
 
 /**
  * The financial advisor. One conversation thread serves both surfaces: typed questions go
@@ -38,12 +27,14 @@ function initialLanguage(): AdvisorLanguage {
  */
 export default function AdvisorPage() {
   const { session, signOut } = useSession();
+  // One language for the whole app: switching it here also switches the interface, and the
+  // other way round, so the advisor never answers in a language the page is not written in.
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
   const user = session?.user ?? null;
   const reducedMotion = useReducedMotion();
 
   const [mode, setMode] = useState<AdvisorMode>('text');
-  const [language, setLanguage] = useState<AdvisorLanguage>(initialLanguage);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, RecommendationStatus | undefined>>({});
@@ -53,19 +44,11 @@ export default function AdvisorPage() {
   const messagesRef = useRef<ConversationMessage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
-  const strings = STRINGS[language];
+  const strings = stringsFor(language);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LANGUAGE_KEY, language);
-    } catch {
-      // ignore
-    }
-  }, [language]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,14 +141,17 @@ export default function AdvisorPage() {
     setMode(next);
   };
 
-  const changeLanguage = (next: AdvisorLanguage) => {
-    if (next === language) return;
-    if (voiceActive) {
+  // The language now changes from the app-wide switcher, which can happen mid-conversation: an
+  // ElevenLabs session is created for one language, so it has to be restarted in the new one.
+  const spokenLanguage = useRef(language);
+  useEffect(() => {
+    if (spokenLanguage.current === language) return;
+    spokenLanguage.current = language;
+    if (isVoiceActive(voice.snapshot.state)) {
       void voice.stop();
-      setToast(STRINGS[next].voiceStoppedForLanguage);
+      setToast(stringsFor(language).voiceStoppedForLanguage);
     }
-    setLanguage(next);
-  };
+  }, [language, voice]);
 
   const send = (text: string) => {
     if (mode === 'voice' && voiceActive && voice.sendText(text)) {
@@ -199,15 +185,15 @@ export default function AdvisorPage() {
     navigate('/', { replace: true });
   };
 
-  const suggestions = useMemo(() => SUGGESTED_QUESTIONS[language], [language]);
+  const suggestions = useMemo(() => suggestionsFor(language), [language]);
   const placeholder = mode === 'voice' && voiceActive ? strings.voicePlaceholder : strings.placeholder;
 
   return (
     <div className="min-h-dvh bg-surface">
-      <AdvisorHeader user={user} strings={strings} mode={mode} language={language} health={health} onMode={changeMode} onLanguage={changeLanguage} onSignOut={() => void handleSignOut()} />
+      <AdvisorHeader user={user} strings={strings} mode={mode} health={health} onMode={changeMode} onSignOut={() => void handleSignOut()} />
 
-      <main className="mx-auto grid max-w-[1400px] gap-5 px-5 py-5 sm:px-8 sm:py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <section aria-label={strings.title} className="flex min-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-2xl bg-panel shadow-card ring-1 ring-ink/5 lg:sticky lg:top-[7.5rem] lg:max-h-[calc(100dvh-9rem)]">
+      <main className="mx-auto grid max-w-[1400px] gap-5 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <section aria-label={strings.title} className="flex min-h-[calc(100dvh-var(--workspace-header,9rem)-3rem)] flex-col overflow-hidden rounded-2xl bg-panel shadow-card ring-1 ring-ink/5 lg:sticky lg:top-[calc(var(--workspace-header,9rem)+1.25rem)] lg:max-h-[calc(100dvh-var(--workspace-header,9rem)-2.5rem)]">
           <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6" role="log" aria-live="polite" aria-relevant="additions">
             {messages.length === 0 ? (
               <EmptyState strings={strings} suggestions={suggestions} onPick={(q) => send(q)} />

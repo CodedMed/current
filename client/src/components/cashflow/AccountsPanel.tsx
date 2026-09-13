@@ -17,7 +17,6 @@ export function AccountsPanel({ accounts, selectedIds, onSelect }: AccountsPanel
   const filtered = selectedIds !== null && selectedIds.length > 0;
   return (
     <Panel
-      id="accounts"
       title="Accounts"
       subtitle={filtered ? `Showing ${selected.size} of ${accounts.length}. Click an account to focus on it.` : 'Click an account to focus the dashboard on it.'}
       aside={

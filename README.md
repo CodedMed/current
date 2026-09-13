@@ -1,4 +1,4 @@
-# Keel — sign-up and onboarding for small-business cash flow
+# current.surf — sign-up and onboarding for small-business cash flow
 
 A production-style demo of the full onboarding journey for a cash-flow management product:
 
@@ -55,6 +55,7 @@ Get a key at http://api.nessieisreal.com and set `NESSIE_API_KEY`. During onboar
 | `npm run dev:all` | Everything above plus the ledger and intelligence services |
 | `npm run dev:services` · `dev:ledger` · `dev:intelligence` | The copilot backend services, with the repo `.env` loaded (`scripts/with-env.mjs`) |
 | `npm run setup:intelligence` | Creates `services/intelligence-service/.venv` and installs every extra (documents, ML, Gemini, ElevenLabs, tests) |
+| `npm run build:i18n` | Rebuilds the interface translation packs in `client/public/i18n` (needs the API running with `GEMINI_API_KEY`). Run it after changing user-facing copy |
 | `npm test` | Node's built-in test runner over the BFF and client logic (`*.test.ts`, no extra framework) |
 | `npm run test:ledger` · `npm run test:intelligence` · `npm run test:all` | Java (JUnit, embedded PostgreSQL) and Python (pytest) suites, or everything |
 
@@ -113,7 +114,8 @@ Browser ──► Express /api/copilot/* ──► services/ledger-service      
 | Private invoice extraction | Python: PyMuPDF → Tesseract → Ollama → strict Pydantic schema; temp files deleted | Deterministic sample values, labelled in `warnings` |
 | Invoice anomaly detection | Python rules + Isolation Forest (from 10 historical invoices); stored by Java | — |
 | CFO advisor (`/advisor`) | Python `GeminiAdvisor` over the Java allowlisted context, validated structured output | `MockAdvisor` answers the same questions from the same context, labelled as demo |
-| Voice advisor (English, Spanish) | ElevenLabs Conversational AI in the browser (signed URL from Python) + the same advisor logic through a client tool | Voice reports unavailable; text keeps working |
+| Voice advisor (13 languages) | ElevenLabs Conversational AI in the browser (signed URL from Python) + the same advisor logic through a client tool. Reachable from every workspace page through the docked mic, and full-screen on `/advisor` | Voice reports unavailable; text keeps working |
+| Interface translation | The language menu in every header translates the whole app. The app's own copy is pre-translated into every language (`client/public/i18n/*.json`, built by `npm run build:i18n`) and loads as a static file; only text the codebase never wrote — merchant names, categories, advisor answers — goes to Gemini at runtime, cached in the service and again in the browser | The app stays English and the menu says translation is unavailable |
 | Financial to-do list | Java `todo_items` with enforced transitions | — |
 | Identity gate | Express Persona decision, mirrored to Java (`POST /v1/persona/status`) and enforced there too | Sandbox decision |
 
@@ -158,17 +160,18 @@ Adding a key is what switches a capability from mock to real; there is no other 
 2. `GET /api/copilot/dashboard` — available cash, 30-day inflow/outflow, the first projected gap, overdue receivables, and priority tasks from the seeded business.
 3. `POST /api/copilot/documents` with `samples/invoices/suspicious_vendor_invoice.pdf` (regenerate the sample PDFs relative to today first with `services/intelligence-service/.venv/bin/python samples/invoices/generate.py`) (`api.copilot.uploadDocument` in the client streams the stages: extracting locally → validating → scoring → saved). The invoice is persisted, an expected outflow enters the ledger, and the risk engine flags it **HIGH**: 30% above the vendor's previous charge, payment details changed, off the usual cadence. Upload it a second time and the duplicate is called out by invoice number — only a local hash of the number is ever kept.
 4. The forecast worsens: expected outflow rises by the invoice amount and the gap moves.
-5. Open **Advisor** (`/advisor`) and ask "What should I do first?" — or `POST /api/copilot/advisor` `{ "message": "What should I do first?", "language": "en" }`. The advisor explains the position, connects the overdue $4,000 to the projected gap and ranks actions; `language: "es"` answers in Spanish, and `POST /api/copilot/voice/session` reports whether voice is available.
-6. `POST /api/copilot/todos` turns a proposed action into a `PROPOSED` task; `PATCH` approves, starts, or completes it. Nothing executes automatically.
+5. Open **Advisor** (`/advisor`) and ask "What should I do first?" — or `POST /api/copilot/advisor` `{ "message": "What should I do first?", "language": "en" }`. The advisor explains the position, connects the overdue $4,000 to the projected gap and ranks actions; any of the 13 offered languages answers in that language, and `POST /api/copilot/voice/session` reports whether voice is available. The mic button in the bottom corner of any workspace page starts the same conversation out loud.
+6. Switch the language in any header. The whole interface — not only the advisor — is translated, including the category names and task titles that come from your own data. The app's own text comes from a pre-built pack (one static file, ~34 KB, ~35 ms) so the page turns over at once; whatever is left goes to Gemini and lands a moment later.
+7. `POST /api/copilot/todos` turns a proposed action into a `PROPOSED` task; `PATCH` approves, starts, or completes it. Nothing executes automatically.
 
 The full route table, request and response shapes, and the service-level contracts are in [docs/api-contracts.md](docs/api-contracts.md); the design and privacy model in [docs/architecture.md](docs/architecture.md). Types are shared in `shared/copilot.ts`, and the client reaches everything through `api.copilot` in `client/src/lib/api.ts`.
 
 ### Tests
 
 ```bash
-npm test                     # 37 tests: BFF advisor contract (context always from the ledger, no automatic tasks), bank-snapshot mapping, identity bridge (push once, seed right, recover from a ledger restart), voice state machine, recommendation → task mapping
+npm test                     # 67 tests: BFF advisor contract (context always from the ledger, no automatic tasks), bank-snapshot mapping, identity bridge (push once, seed right, recover from a ledger restart), Persona sessions (resume, recover from an inquiry Persona never had), voice state machine, interface translation (route, string filter, and the DOM translator against a real DOM), automatic invoice risk backfill, recommendation → task mapping
 npm run test:ledger          # 66 tests: forecast calculator, Nessie normalisation (statuses, receivables, withdrawals, recurring bills), bank snapshot ingest, Persona guard and mirroring, invoice ingestion and risk persistence, demo seeding, task transitions, advisor context
-npm run test:intelligence    # 116 tests: extraction schemas and privacy, OCR cleanup, rules, features, Isolation Forest, advisor schemas, demo advisor, Gemini adapter and fallback, voice contracts
+npm run test:intelligence    # 125 tests: extraction schemas and privacy, OCR cleanup, rules, features, Isolation Forest, advisor schemas, demo advisor, Gemini adapter and fallback, voice contracts, translation cache and degradation
 npm run typecheck
 ```
 
@@ -234,7 +237,7 @@ in demo mode the demo advisor then answers and the reply is labelled **Gemini un
    waiting for a response.
 3. Give the agent a system prompt along these lines:
 
-   > You are the voice of Keel's cash-flow advisor. For every question about the user's money,
+   > You are the voice of current.surf's cash-flow advisor. For every question about the user's money,
    > cash, invoices, payments, expenses, forecast, risks or tasks, call the `ask_cash_flow_advisor`
    > tool with the user's question and read its answer back to the user as-is. Never answer a
    > financial question from your own knowledge and never invent numbers, dates, clients or
@@ -337,7 +340,7 @@ docker-compose.dev.yml   TimescaleDB + both services (the web app runs on the ho
 | `PUT /api/onboarding/business-type` · `PUT /api/onboarding/features` | Save answers (validated with zod) |
 | `POST /api/onboarding/provision` · `GET /api/onboarding/provision/status` | Seed and poll the Nessie workspace |
 | `GET /api/dashboard` | The cash-flow dashboard model built from Nessie data |
-| `/api/cashflow/*` | The Keel dashboard API (see above) |
+| `/api/cashflow/*` | The current.surf dashboard API (see above) |
 | `/api/copilot/*` | The Cash Flow Copilot backend: dashboard, forecast, documents, invoices and risk, advisor, voice, tasks (see [docs/api-contracts.md](docs/api-contracts.md)) |
 | `/advisor` (client route) | The text and voice financial advisor (see [Financial advisor](#financial-advisor-advisor)) |
 

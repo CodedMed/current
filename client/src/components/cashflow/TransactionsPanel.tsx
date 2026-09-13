@@ -69,7 +69,6 @@ export function TransactionsPanel({ companyId, accountIds, recent, accounts, cat
 
   return (
     <Panel
-      id="transactions"
       title={expanded ? 'Transactions' : 'Recent transactions'}
       subtitle={subtitle}
       aside={

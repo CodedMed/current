@@ -3,7 +3,7 @@
 -- forecast, so a bank outage or an unknown customer can never turn the dashboard into $0.
 --
 -- Balances are signed: deposit accounts positive, credit cards negative (the amount owed), so the
--- sum is the business's cash position and matches the Keel dashboard's total.
+-- sum is the business's cash position and matches the current.surf dashboard's total.
 CREATE TABLE bank_accounts (
     user_id UUID NOT NULL REFERENCES app_users(id),
     account_id TEXT NOT NULL,

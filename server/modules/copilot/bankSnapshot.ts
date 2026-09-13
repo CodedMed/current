@@ -6,7 +6,7 @@ import type { WorkspaceState } from '../../store/userStore.ts';
 /**
  * The bank snapshot as the ledger service accepts it (`POST /v1/bank/snapshot`): the Nessie
  * records the BFF already fetched for the user's workspace, with merchant names resolved and
- * balances derived the same way the Keel dashboard derives them. Dates are calendar dates; card
+ * balances derived the same way the current.surf dashboard derives them. Dates are calendar dates; card
  * balances are the amount owed (positive), which the ledger signs.
  */
 export interface BankSnapshotPush {
@@ -50,7 +50,7 @@ export function toBankSnapshot(workspace: WorkspaceState, snapshot: NessieSnapsh
       id: a._id,
       type: a.type,
       nickname: a.nickname,
-      // Same rule as the Keel ledger: cards report what is owed; deposit accounts may need the
+      // Same rule as the current.surf ledger: cards report what is owed; deposit accounts may need the
       // seeded history applied when the bank did not move balances itself.
       balance: round2(a.type === 'Credit Card' || workspace.balancesApplied ? a.balance : a.balance + netSettled(a._id, snapshot)),
     })),

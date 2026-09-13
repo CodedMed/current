@@ -4,7 +4,7 @@ import logging
 
 from fastapi import FastAPI
 
-from app.api import advisor, documents, risk, voice
+from app.api import advisor, documents, i18n, risk, voice
 from app.config import get_settings
 from app.errors import ApiError, api_error_handler
 from app.risk.isolation_forest import ml_available
@@ -27,6 +27,7 @@ app.include_router(documents.router)
 app.include_router(risk.router)
 app.include_router(advisor.router)
 app.include_router(voice.router)
+app.include_router(i18n.router)
 
 
 @app.get("/health", tags=["health"])

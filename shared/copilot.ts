@@ -256,8 +256,61 @@ export interface ProposedAction {
   estimatedImpact: number | null;
 }
 
-export const ADVISOR_LANGUAGES = ['en', 'es'] as const;
+/**
+ * Every language the ElevenLabs agent can speak, so text and voice never disagree about what
+ * is on offer. `SUPPORTED_LANGUAGES` in the environment is what the services enforce; this list
+ * is what the web app shows, and the two are meant to match.
+ */
+export const ADVISOR_LANGUAGES = ['en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'hi', 'ja', 'ko', 'zh', 'ar'] as const;
 export type AdvisorLanguage = (typeof ADVISOR_LANGUAGES)[number];
+
+export interface LanguageInfo {
+  code: AdvisorLanguage;
+  /** The name as a speaker of that language writes it — what belongs in the menu. */
+  label: string;
+  /** The English name, for tooltips and for anyone scanning the list in English. */
+  english: string;
+  rtl: boolean;
+}
+
+export const LANGUAGES: readonly LanguageInfo[] = [
+  { code: 'en', label: 'English', english: 'English', rtl: false },
+  { code: 'es', label: 'Espa\u00f1ol', english: 'Spanish', rtl: false },
+  { code: 'fr', label: 'Fran\u00e7ais', english: 'French', rtl: false },
+  { code: 'de', label: 'Deutsch', english: 'German', rtl: false },
+  { code: 'it', label: 'Italiano', english: 'Italian', rtl: false },
+  { code: 'pt', label: 'Portugu\u00eas', english: 'Portuguese', rtl: false },
+  { code: 'nl', label: 'Nederlands', english: 'Dutch', rtl: false },
+  { code: 'pl', label: 'Polski', english: 'Polish', rtl: false },
+  { code: 'hi', label: '\u0939\u093f\u0928\u094d\u0926\u0940', english: 'Hindi', rtl: false },
+  { code: 'ja', label: '\u65e5\u672c\u8a9e', english: 'Japanese', rtl: false },
+  { code: 'ko', label: '\ud55c\uad6d\uc5b4', english: 'Korean', rtl: false },
+  { code: 'zh', label: '\u4e2d\u6587', english: 'Chinese', rtl: false },
+  { code: 'ar', label: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629', english: 'Arabic', rtl: true },
+];
+
+export function isAdvisorLanguage(value: string): value is AdvisorLanguage {
+  return (ADVISOR_LANGUAGES as readonly string[]).includes(value);
+}
+
+export function languageInfo(code: AdvisorLanguage): LanguageInfo {
+  return LANGUAGES.find((l) => l.code === code) ?? (LANGUAGES[0] as LanguageInfo);
+}
+
+/* ───────────────────── Interface translation ───────────────────── */
+
+export interface TranslateRequest {
+  language: AdvisorLanguage;
+  strings: string[];
+}
+
+export interface TranslateResponse {
+  language: AdvisorLanguage;
+  /** `none` means nothing was translated: no Gemini key, so the source text stands. */
+  provider: 'gemini' | 'none';
+  /** Source string → translation, for every string the request could translate. */
+  translations: Record<string, string>;
+}
 
 export type AdvisorChannel = 'text' | 'voice';
 
@@ -290,6 +343,14 @@ export interface AdvisorAsk {
   message: string;
   language?: AdvisorLanguage;
   history?: AdvisorTurn[];
+}
+
+/** Outcome of scoring every invoice that had never been scored. */
+export interface RiskBackfillResult {
+  scored: number;
+  failed: number;
+  /** Left over when there were more than one request may score; call again to continue. */
+  remaining: number;
 }
 
 /* ───────────────────────── Voice ───────────────────────── */

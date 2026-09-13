@@ -18,7 +18,7 @@ export OLLAMA_MODEL=llama3.2
 .venv/bin/python -m uvicorn app.main:app --port 8000
 ```
 
-Start the ledger service and the Keel app using the root README (`npm run dev:ledger`,
+Start the ledger service and the current.surf app using the root README (`npm run dev:ledger`,
 `npm run dev`). Sign in, complete verification, then upload
 `samples/invoices/suspicious_vendor_invoice.pdf` through `POST /api/copilot/documents`
 (`api.copilot.uploadDocument` in the client).

@@ -25,7 +25,6 @@ export function BreakdownPanel({ breakdown, periodLabel }: Props) {
 
   return (
     <Panel
-      id="reports"
       title={title}
       subtitle={periodLabel}
       aside={

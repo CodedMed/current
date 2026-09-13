@@ -9,6 +9,7 @@ import { createAuthRouter } from './modules/auth/routes.ts';
 // import { createDashboardRouter } from './modules/cashflow/routes.ts';
 import { createCashflowRouter } from './modules/cashflow/mock/routes.ts';
 import { createCopilotRouter } from './modules/copilot/index.ts';
+import { createI18nRouter } from './modules/i18n/routes.ts';
 import { createIdentityRouter, createIdentityWebhookRouter } from './modules/identity/routes.ts';
 import { createOnboardingRouter } from './modules/onboarding/routes.ts';
 import type { Services } from './services.ts';
@@ -48,6 +49,9 @@ export function createApp(services: Services): express.Express {
   app.use('/api/cashflow', createCashflowRouter({ config, store: cashflow }));
   // Cash Flow Copilot backend (documents, invoice risk, deterministic forecast, advisor, voice, tasks).
   app.use('/api/copilot', createCopilotRouter({ config, ...copilot }));
+  // Interface translation. Open to signed-out visitors: sign-up and verification are the
+  // pages most in need of it, and they come before a session exists.
+  app.use('/api/i18n', createI18nRouter(copilot.intelligence));
   app.use('/api', notFoundHandler);
 
   if (config.isProduction) {

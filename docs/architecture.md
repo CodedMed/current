@@ -1,6 +1,6 @@
 # Architecture
 
-Keel is the sign-up, identity, onboarding and dashboard experience for small-business cash flow.
+current.surf is the sign-up, identity, onboarding and dashboard experience for small-business cash flow.
 The Cash Flow Copilot backend adds the product loop **verify → ingest → normalize → forecast/detect
 → advise → act**: private documents read on your own machine, a deterministic cash-flow forecast,
 invoice anomaly detection, and a reasoning layer that explains what to do next.
@@ -156,7 +156,7 @@ only when the owner presses **Add to tasks**, which creates an `ADVISOR` task wi
 
 ## One bank snapshot
 
-Express provisions a Nessie workspace per user during onboarding and reads it for the Keel
+Express provisions a Nessie workspace per user during onboarding and reads it for the current.surf
 dashboard. The ledger service holds the same records: the copilot bridge pushes the workspace's
 snapshot to `POST /v1/bank/snapshot` before the first financial call, and every fresh snapshot the
 dashboard reads from Nessie is pushed again when it changed. The ledger normalises the records

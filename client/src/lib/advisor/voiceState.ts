@@ -8,6 +8,8 @@
  *                    └──failure──→ error ←──────────────────────┘
  */
 
+import type { AdvisorLanguage } from '../../../../shared/copilot.ts';
+
 export type VoiceState = 'idle' | 'unavailable' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 
 export type VoiceEvent =
@@ -83,7 +85,7 @@ export function reduceVoice(snapshot: VoiceSnapshot, event: VoiceEvent): VoiceSn
 }
 
 /** Maps a thrown start-up failure onto a sentence the owner can act on. */
-export function describeVoiceStartError(err: unknown, language: 'en' | 'es' = 'en'): string {
+export function describeVoiceStartError(err: unknown, language: AdvisorLanguage = 'en'): string {
   const es = language === 'es';
   const name = typeof err === 'object' && err !== null && 'name' in err ? String((err as { name: unknown }).name) : '';
   const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
