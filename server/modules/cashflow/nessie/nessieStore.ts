@@ -9,7 +9,6 @@ import type {
   ReviewDecision,
   SyncResponse,
   TransactionListResponse,
-  TransactionReview,
   UpdateTransactionInput,
 } from '../../../../shared/types.ts';
 import { isoDate, startOfToday } from '../../../lib/dates.ts';
@@ -32,6 +31,7 @@ import { applyForLoan, buildLoanOffers, toggleSavedOffer } from '../mock/lending
 import { decideReview } from '../mock/review.ts';
 import type { CashflowStore } from '../store.ts';
 import { ledgerFromSnapshot } from './nessieLedger.ts';
+import type { OverlayRepository, WorkspaceOverlays } from './overlayStore.ts';
 
 /** How long a ledger read from Nessie is reused before it is fetched again. */
 const CACHE_TTL_MS = 60_000;
@@ -45,19 +45,22 @@ interface CacheEntry {
  * Cash-flow store backed by the Nessie banking API. Each user's workspace is
  * one company. Reads come from Nessie; manual entries are written through to
  * Nessie; edits Nessie cannot hold (categories, notes, review decisions,
- * financing state) live in memory and are re-applied after every fetch.
+ * financing state) are kept as per-user overlays in the `OverlayRepository`
+ * and re-applied after every fetch.
  */
 export class NessieCashflowStore implements CashflowStore {
   readonly source = 'nessie' as const;
   readonly #api: NessieApi;
   readonly #users: UserRepository;
+  readonly #overlayStore: OverlayRepository;
   readonly #cache = new Map<string, CacheEntry>();
-  readonly #edits = new Map<string, Map<string, UpdateTransactionInput>>();
-  readonly #reviews = new Map<string, Map<string, TransactionReview>>();
+  /** Overlays loaded once per user per process; every change is written through. */
+  readonly #overlays = new Map<string, WorkspaceOverlays>();
 
-  constructor(api: NessieApi, users: UserRepository) {
+  constructor(api: NessieApi, users: UserRepository, overlays: OverlayRepository) {
     this.#api = api;
     this.#users = users;
+    this.#overlayStore = overlays;
   }
 
   async companies(userId: string): Promise<CashflowCompany[]> {
@@ -124,7 +127,9 @@ export class NessieCashflowStore implements CashflowStore {
       id = created._id;
     }
     // Nessie keeps the money movement; the category and wording live here.
-    this.#editsFor(userId).set(id, { categoryId: input.categoryId, merchant: input.merchant.trim(), description: input.description?.trim() || undefined });
+    const overlays = await this.#overlaysFor(userId);
+    overlays.edits.set(id, { categoryId: input.categoryId, merchant: input.merchant.trim(), description: input.description?.trim() || undefined });
+    await this.#overlayStore.save(userId, overlays);
     const txn = buildManualTransaction(id, input);
     insertLedgerTransaction(ledger, account, txn);
     return txn;
@@ -133,15 +138,20 @@ export class NessieCashflowStore implements CashflowStore {
   async updateTransaction(userId: string, companyId: string, id: string, patch: UpdateTransactionInput): Promise<CashTransaction> {
     const ledger = await this.#ledger(userId, companyId);
     const txn = patchLedgerTransaction(ledger, id, patch);
-    const edits = this.#editsFor(userId);
-    edits.set(id, { ...edits.get(id), ...patch });
+    const overlays = await this.#overlaysFor(userId);
+    overlays.edits.set(id, { ...overlays.edits.get(id), ...patch });
+    await this.#overlayStore.save(userId, overlays);
     return txn;
   }
 
   async decideReview(userId: string, companyId: string, id: string, decision: ReviewDecision, note: string | null): Promise<CashTransaction> {
     const ledger = await this.#ledger(userId, companyId);
     const txn = decideReview(ledger, id, decision, note);
-    if (txn.review) this.#reviewsFor(userId).set(id, { ...txn.review });
+    if (txn.review) {
+      const overlays = await this.#overlaysFor(userId);
+      overlays.reviews.set(id, { ...txn.review });
+      await this.#overlayStore.save(userId, overlays);
+    }
     return txn;
   }
 
@@ -149,12 +159,17 @@ export class NessieCashflowStore implements CashflowStore {
     return buildLoanOffers(await this.#ledger(userId, companyId));
   }
 
+  /** `ledger.financing` is the user's overlay object itself, so the mutation only needs persisting. */
   async applyForLoan(userId: string, companyId: string, offerId: string, amount: number): Promise<LoanOffer> {
-    return applyForLoan(await this.#ledger(userId, companyId), offerId, amount);
+    const offer = applyForLoan(await this.#ledger(userId, companyId), offerId, amount);
+    await this.#overlayStore.save(userId, await this.#overlaysFor(userId));
+    return offer;
   }
 
   async toggleSavedOffer(userId: string, companyId: string, offerId: string): Promise<LoanOffer> {
-    return toggleSavedOffer(await this.#ledger(userId, companyId), offerId);
+    const offer = toggleSavedOffer(await this.#ledger(userId, companyId), offerId);
+    await this.#overlayStore.save(userId, await this.#overlaysFor(userId));
+    return offer;
   }
 
   /** Re-reads the workspace from Nessie and reports how many new posted entries arrived. */
@@ -176,6 +191,7 @@ export class NessieCashflowStore implements CashflowStore {
     const cached = this.#cache.get(userId);
     if (!refresh && cached && cached.ledger.today === today && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.ledger;
 
+    const overlays = await this.#overlaysFor(userId);
     const snapshot = await fetchSnapshot(this.#api, workspace);
     const ledger = ledgerFromSnapshot({
       snapshot,
@@ -183,27 +199,18 @@ export class NessieCashflowStore implements CashflowStore {
       user,
       today: startOfToday(),
       now: new Date(),
-      overlays: { edits: this.#edits.get(userId), reviews: this.#reviews.get(userId), financing: cached?.ledger.financing },
+      overlays,
     });
     this.#cache.set(userId, { ledger, fetchedAt: Date.now() });
     return ledger;
   }
 
-  #editsFor(userId: string): Map<string, UpdateTransactionInput> {
-    let map = this.#edits.get(userId);
-    if (!map) {
-      map = new Map();
-      this.#edits.set(userId, map);
+  async #overlaysFor(userId: string): Promise<WorkspaceOverlays> {
+    let overlays = this.#overlays.get(userId);
+    if (!overlays) {
+      overlays = await this.#overlayStore.load(userId);
+      this.#overlays.set(userId, overlays);
     }
-    return map;
-  }
-
-  #reviewsFor(userId: string): Map<string, TransactionReview> {
-    let map = this.#reviews.get(userId);
-    if (!map) {
-      map = new Map();
-      this.#reviews.set(userId, map);
-    }
-    return map;
+    return overlays;
   }
 }

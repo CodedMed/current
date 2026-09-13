@@ -44,13 +44,22 @@ public class PersonaService {
     }
 
     /**
-     * Applies a verification decision the BFF established with Persona. Only callers holding the
-     * internal service token reach this path, so the decision is trusted as server-derived.
+     * Applies a verification decision the BFF established with Persona, along with the sign-in
+     * profile it holds, so the user row here is not anonymous. Only callers holding the internal
+     * service token reach this path, so both are trusted as server-derived.
      */
     @Transactional
-    public AppUser applyStatus(AppUser user, PersonaStatus status, String inquiryId) {
-        String normalizedInquiryId = inquiryId == null || inquiryId.isBlank() ? null : inquiryId.trim();
-        userRepository.updatePersonaStatus(user.id(), status, normalizedInquiryId);
+    public AppUser applyStatus(AppUser user, PersonaStatus status, String inquiryId, String email, String displayName) {
+        userRepository.updatePersonaStatus(user.id(), status, blankToNull(inquiryId));
+        String normalizedEmail = blankToNull(email);
+        String normalizedName = blankToNull(displayName);
+        if (normalizedEmail != null || normalizedName != null) {
+            userRepository.updateProfile(user.id(), normalizedEmail, normalizedName);
+        }
         return userRepository.findById(user.id()).orElse(user);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

@@ -30,7 +30,7 @@ export function createApp(services: Services): express.Express {
   app.use('/api/identity/webhook', createIdentityWebhookRouter(identity));
 
   app.use(express.json({ limit: '100kb' }));
-  app.use(createSessionMiddleware(config));
+  app.use(createSessionMiddleware(config, services.sessionStore ?? undefined));
   app.use(attachUser(users));
 
   app.get('/api/health', (_req, res) => {

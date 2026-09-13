@@ -29,6 +29,9 @@ const envSchema = z.object({
   /** Where the cash-flow dashboard reads from: the Nessie workspace (default) or the generated sample ledger. */
   CASHFLOW_SOURCE: z.enum(['nessie', 'mock']).default('nessie'),
 
+  /** Shared with the ledger service. Express keeps users, sessions, and dashboard edits in its `keel` schema. */
+  DATABASE_URL: z.string().optional(),
+
   /* Cash Flow Copilot backend services (Java ledger + Python intelligence). */
   DEMO_MODE: z.stringbool().optional(),
   INTERNAL_SERVICE_TOKEN: z.string().min(8).optional(),
@@ -81,6 +84,8 @@ export interface AppConfig {
   persona: PersonaConfig | null;
   nessie: NessieConfig | null;
   cashflowSource: 'nessie' | 'mock';
+  /** PostgreSQL / Tiger Data connection string; `null` keeps user state in memory. */
+  databaseUrl: string | null;
   copilot: CopilotConfig;
   integrations: IntegrationStatus;
   /** Human-readable notes about why an integration is in sandbox mode. */
@@ -157,6 +162,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const demoMode = e.DEMO_MODE ?? !isProduction;
   if (demoMode) notes.push('DEMO_MODE is on: verified users are seeded with the demo business in the ledger service.');
 
+  const databaseUrl = e.DATABASE_URL ?? null;
+  if (!databaseUrl) notes.push('DATABASE_URL not set; users, sessions, and dashboard edits are kept in memory and reset on restart.');
+
   return {
     env: e.NODE_ENV,
     isProduction,
@@ -167,6 +175,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     persona,
     nessie,
     cashflowSource: e.CASHFLOW_SOURCE,
+    databaseUrl,
     copilot: {
       demoMode,
       internalServiceToken,

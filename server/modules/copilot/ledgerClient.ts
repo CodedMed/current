@@ -50,6 +50,12 @@ function horizonQuery(horizonDays?: number): string {
  * financial state. Every call carries the internal token and the caller's
  * stable subject; the ledger maps the subject to its own user record.
  */
+/** Sign-in profile forwarded so the ledger's `app_users` row is not anonymous. */
+export interface LedgerProfile {
+  email: string;
+  displayName: string;
+}
+
 export class LedgerClient {
   readonly baseUrl: string;
   readonly #token: string;
@@ -75,8 +81,12 @@ export class LedgerClient {
   }
 
   /** Mirrors the verification decision Express obtained from Persona. */
-  syncPersonaStatus(subject: string, status: CopilotPersonaStatus, inquiryId: string | null): Promise<CopilotMe> {
-    return this.#call(subject, { method: 'POST', path: '/v1/persona/status', json: { status, inquiryId } });
+  syncPersonaStatus(subject: string, status: CopilotPersonaStatus, inquiryId: string | null, profile?: LedgerProfile): Promise<CopilotMe> {
+    return this.#call(subject, {
+      method: 'POST',
+      path: '/v1/persona/status',
+      json: { status, inquiryId, email: profile?.email ?? null, displayName: profile?.displayName ?? null },
+    });
   }
 
   /** Demo mode only: gives a verified user the seeded demo business, once. */

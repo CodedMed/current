@@ -57,6 +57,19 @@ public class UserRepository {
                 .update();
     }
 
+    /** Fills in the sign-in profile the BFF forwards; a null keeps whatever is already stored. */
+    public void updateProfile(UUID userId, String email, String displayName) {
+        jdbcClient.sql("""
+                        UPDATE app_users
+                           SET email = COALESCE(?, email),
+                               display_name = COALESCE(?, display_name),
+                               updated_at = now()
+                         WHERE id = ?
+                        """)
+                .params(email, displayName, userId)
+                .update();
+    }
+
     public Optional<AppUser> findByPersonaReferenceId(String referenceId) {
         try {
             return findById(UUID.fromString(referenceId));

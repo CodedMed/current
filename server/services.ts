@@ -1,3 +1,4 @@
+import type session from 'express-session';
 import type { AppConfig } from './config.ts';
 import { GoogleAuthProvider } from './modules/auth/googleProvider.ts';
 import { SandboxAuthProvider } from './modules/auth/sandboxProvider.ts';
@@ -13,7 +14,8 @@ import type { IdentityService } from './modules/identity/types.ts';
 import { createNessieApi } from './modules/nessie/index.ts';
 import { Provisioner } from './modules/nessie/provisioner.ts';
 import type { NessieApi } from './modules/nessie/types.ts';
-import { InMemoryUserRepository, type UserRepository } from './store/userStore.ts';
+import { createPersistence } from './store/persistence.ts';
+import type { UserRepository } from './store/userStore.ts';
 
 /**
  * Persona is live: with `PERSONA_API_KEY` and `PERSONA_TEMPLATE_ID` set the
@@ -28,7 +30,10 @@ const IDENTITY_BYPASS = false;
  */
 export interface Services {
   config: AppConfig;
+  /** Where user state lives: PostgreSQL (`DATABASE_URL`) or memory. */
+  persistence: 'postgres' | 'memory';
   users: UserRepository;
+  sessionStore: session.Store | null;
   auth: AuthProvider;
   identity: IdentityService;
   identityBypassed: boolean;
@@ -37,10 +42,13 @@ export interface Services {
   cashflow: CashflowStore;
   /** Cash Flow Copilot backend: Java ledger + Python intelligence, behind Express. */
   copilot: CopilotServices;
+  /** Releases database connections; call on shutdown. */
+  close(): Promise<void>;
 }
 
-export function createServices(config: AppConfig): Services {
-  const users = new InMemoryUserRepository();
+export async function createServices(config: AppConfig): Promise<Services> {
+  const store = await createPersistence(config);
+  const users = store.users;
   const auth: AuthProvider = config.google ? new GoogleAuthProvider(config.google) : new SandboxAuthProvider(config.appUrl);
 
   let identity: IdentityService;
@@ -58,7 +66,21 @@ export function createServices(config: AppConfig): Services {
 
   const nessie = createNessieApi(config);
   const provisioner = new Provisioner(nessie, users);
-  const cashflow: CashflowStore = config.cashflowSource === 'mock' ? new MockCashflowStore() : new NessieCashflowStore(nessie, users);
+  const cashflow: CashflowStore =
+    config.cashflowSource === 'mock' ? new MockCashflowStore() : new NessieCashflowStore(nessie, users, store.overlays);
   const copilot = createCopilotServices(effectiveConfig);
-  return { config: effectiveConfig, users, auth, identity, identityBypassed: IDENTITY_BYPASS, nessie, provisioner, cashflow, copilot };
+  return {
+    config: effectiveConfig,
+    persistence: store.mode,
+    users,
+    sessionStore: store.sessionStore,
+    auth,
+    identity,
+    identityBypassed: IDENTITY_BYPASS,
+    nessie,
+    provisioner,
+    cashflow,
+    copilot,
+    close: store.close,
+  };
 }

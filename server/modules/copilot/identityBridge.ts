@@ -4,7 +4,7 @@ import type { AppConfig } from '../../config.ts';
 import { acceptCompletedPolicy, isIdentityVerified } from '../../flow.ts';
 import { createLogger } from '../../lib/logger.ts';
 import type { UserRecord } from '../../store/userStore.ts';
-import type { LedgerClient } from './ledgerClient.ts';
+import type { LedgerClient, LedgerProfile } from './ledgerClient.ts';
 import { UpstreamError } from './upstream.ts';
 
 const log = createLogger('copilot');
@@ -14,14 +14,15 @@ const log = createLogger('copilot');
  *
  * Express owns sign-in and Persona: it creates inquiries, re-reads decisions
  * from Persona server-side, and handles signed webhooks. The ledger service
- * only needs the outcome, so this bridge mirrors it over the internal channel
- * before any financial call, and in demo mode seeds the demo business for a
- * newly verified user so the walkthrough works without sponsor credentials.
+ * only needs the outcome plus who the user is, so this bridge mirrors the
+ * decision and the sign-in profile over the internal channel before any
+ * financial call, and in demo mode seeds the demo business for a newly
+ * verified user so the walkthrough works without sponsor credentials.
  */
 export class CopilotIdentityBridge {
   readonly #ledger: LedgerClient;
   readonly #config: AppConfig;
-  /** Last status mirrored per subject, so a steady state costs no round-trip. */
+  /** Last state mirrored per subject, so a steady state costs no round-trip. */
   readonly #mirrored = new Map<string, string>();
   readonly #seeded = new Set<string>();
 
@@ -52,19 +53,13 @@ export class CopilotIdentityBridge {
     }
   }
 
-  /** Mirrors the current decision when it changed since the last mirror. Returns the ledger's view. */
+  /** Mirrors the current decision and profile when either changed since the last mirror. Returns the ledger's view. */
   async mirror(user: UserRecord, force = false): Promise<CopilotMe> {
     const subject = this.subjectFor(user);
-    const status = this.ledgerStatusFor(user);
-    const inquiryId = user.identity.inquiryId;
-    const key = `${status}|${inquiryId ?? ''}`;
-    if (!force && this.#mirrored.get(subject) === key) {
+    if (!force && this.#mirrored.get(subject) === this.#mirrorKey(user)) {
       return this.#ledger.me(subject);
     }
-    const me = await this.#ledger.syncPersonaStatus(subject, status, inquiryId);
-    this.#mirrored.set(subject, key);
-    log.info('Mirrored identity to ledger', { subject, status });
-    return me;
+    return this.#send(user);
   }
 
   /**
@@ -73,14 +68,10 @@ export class CopilotIdentityBridge {
    */
   async prepare(user: UserRecord): Promise<string> {
     const subject = this.subjectFor(user);
-    const status = this.ledgerStatusFor(user);
-    const key = `${status}|${user.identity.inquiryId ?? ''}`;
-    if (this.#mirrored.get(subject) !== key) {
-      await this.#ledger.syncPersonaStatus(subject, status, user.identity.inquiryId);
-      this.#mirrored.set(subject, key);
-      log.info('Mirrored identity to ledger', { subject, status });
+    if (this.#mirrored.get(subject) !== this.#mirrorKey(user)) {
+      await this.#send(user);
     }
-    if (this.#config.copilot.demoMode && status === 'approved' && !this.#seeded.has(subject)) {
+    if (this.#config.copilot.demoMode && this.ledgerStatusFor(user) === 'approved' && !this.#seeded.has(subject)) {
       try {
         const result = await this.#ledger.seedDemo(subject);
         if (result.seeded) log.info('Seeded demo business', { subject, invoices: result.invoices, todos: result.todos });
@@ -101,5 +92,23 @@ export class CopilotIdentityBridge {
   invalidate(subject: string): void {
     this.#mirrored.delete(subject);
     this.#seeded.delete(subject);
+  }
+
+  #profileFor(user: UserRecord): LedgerProfile {
+    return { email: user.email, displayName: user.name };
+  }
+
+  /** Everything the ledger is told about a user; a change in any part re-sends. */
+  #mirrorKey(user: UserRecord): string {
+    return `${this.ledgerStatusFor(user)}|${user.identity.inquiryId ?? ''}|${user.email}|${user.name}`;
+  }
+
+  async #send(user: UserRecord): Promise<CopilotMe> {
+    const subject = this.subjectFor(user);
+    const status = this.ledgerStatusFor(user);
+    const me = await this.#ledger.syncPersonaStatus(subject, status, user.identity.inquiryId, this.#profileFor(user));
+    this.#mirrored.set(subject, this.#mirrorKey(user));
+    log.info('Mirrored identity to ledger', { subject, status });
+    return me;
   }
 }

@@ -5,13 +5,15 @@ import type { AppConfig } from '../config.ts';
 export const SESSION_COOKIE = 'keel.sid';
 
 /**
- * Cookie-backed sessions. The default MemoryStore is intentional for this demo;
- * swap in a Redis/Postgres store here without touching route code.
+ * Cookie-backed sessions. With `DATABASE_URL` set the store is PostgreSQL
+ * (`keel.sessions`, see `store/persistence.ts`) so a restart keeps everyone
+ * signed in; otherwise the default MemoryStore is used.
  */
-export function createSessionMiddleware(config: AppConfig) {
+export function createSessionMiddleware(config: AppConfig, store?: session.Store) {
   return session({
     name: SESSION_COOKIE,
     secret: config.sessionSecret,
+    store,
     resave: false,
     saveUninitialized: false,
     rolling: true,

@@ -6,7 +6,7 @@ A production-style demo of the full onboarding journey for a cash-flow managemen
 
 Everything runs from one repository: an Express 5 API (Node 24, TypeScript run natively), a React 19 + Tailwind CSS 4 client built with Vite 8, and the **Cash Flow Copilot backend** — a Java ledger service and a Python intelligence service that add private-document ingestion, invoice risk scoring, a deterministic cash-flow forecast, a CFO advisor, voice, and a financial to-do list behind the same API. See [Cash Flow Copilot backend](#cash-flow-copilot-backend).
 
-> **Current state.** The full journey runs: Persona verification (live when `PERSONA_API_KEY`/`PERSONA_TEMPLATE_ID` are set; `IDENTITY_BYPASS` in `server/services.ts` skips it while developing) → business type → priorities → Nessie workspace provisioning → the cash-flow dashboard. The dashboard reads from the user's Nessie workspace by default: `server/modules/cashflow/nessie/nessieLedger.ts` converts Nessie accounts, deposits, purchases, withdrawals, and bills into the ledger the analytics, review queue, and financing modules consume, projecting recurring streams forward for the forecast. Manual entries are written back to Nessie; categories, notes, and review decisions live in memory. Set `CASHFLOW_SOURCE=mock` to use the generated sample ledger instead. See [Cash-flow dashboard](#cash-flow-dashboard-mock-api) below.
+> **Current state.** The full journey runs: Persona verification (live when `PERSONA_API_KEY`/`PERSONA_TEMPLATE_ID` are set; `IDENTITY_BYPASS` in `server/services.ts` skips it while developing) → business type → priorities → Nessie workspace provisioning → the cash-flow dashboard. The dashboard reads from the user's Nessie workspace by default: `server/modules/cashflow/nessie/nessieLedger.ts` converts Nessie accounts, deposits, purchases, withdrawals, and bills into the ledger the analytics, review queue, and financing modules consume, projecting recurring streams forward for the forecast. Manual entries are written back to Nessie; categories, notes, review decisions, and financing state are stored per user in `keel.workspace_overlays` when `DATABASE_URL` is set (in memory otherwise). Set `CASHFLOW_SOURCE=mock` to use the generated sample ledger instead. See [Cash-flow dashboard](#cash-flow-dashboard-mock-api) below.
 
 ## Quick start
 
@@ -127,6 +127,17 @@ movers) is served from that rollup instead of scanning rows. Without the extensi
 degrades to the equivalent portable query. `GET :8080/health` reports which mode is live — and
 whether the database answers at all. `scripts/db.sh reset` drops the volume for a clean re-seed.
 See [docs/tigerdata.md](docs/tigerdata.md).
+
+### Where state lives
+
+The same `DATABASE_URL` serves both halves of the app, with a schema per owner:
+
+| Schema | Owner | Holds | Without `DATABASE_URL` |
+|---|---|---|---|
+| `public.*` | Java ledger, via Flyway (`db/migrations`, `db/timescale`) | `app_users` (subject, email, display name, Persona status), `cash_events` hypertable, `invoices`, `invoice_risks`, `todo_items`, `nessie_sync_state`, `cash_daily` aggregate | throwaway embedded PostgreSQL |
+| `keel.*` | Express, idempotent DDL at boot (`server/store/postgres.ts`) | `users` (sign-in profile, identity decision, onboarding choices, Nessie workspace), `sessions`, `workspace_overlays` (category/note edits, review decisions, financing) | in-memory maps + MemoryStore |
+
+Both keep the user keyed by the auth subject (`google:<sub>`), so a returning Google sign-in finds its rows on either side. Express forwards the email and display name with each Persona decision (`POST /v1/persona/status`), so the ledger's `app_users` row is never anonymous. The sandbox Google provider deliberately mints a new subject per sign-in so onboarding can be replayed; returning-user behaviour needs real `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. `SESSION_SECRET` must be set for sessions to outlive an API restart.
 
 Adding a key is what switches a capability from mock to real; there is no other flag. `NESSIE_API_KEY` for live bank data in the ledger (in any `DEMO_MODE`; the BFF passes the customer it provisioned), `OLLAMA_MODEL` (after `ollama pull llama3.2`, see [docs/local-ai.md](docs/local-ai.md)) for real extraction, `GEMINI_API_KEY` for the advisor, `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` for voice. Keep `INTERNAL_SERVICE_TOKEN` identical everywhere; the `npm run dev:*` scripts load the repo `.env` for the services so that happens by itself.
 
@@ -272,7 +283,7 @@ server/
   services.ts      Composition root — swap implementations here
   flow.ts          nextStep rules and session serialisation
   lib/             Errors, sessions, guards, HTTP + date helpers
-  store/           UserRepository interface + in-memory implementation
+  store/           UserRepository interface, in-memory and PostgreSQL implementations, session store, `keel` schema
   modules/
     auth/          Google OAuth (PKCE) provider, sandbox provider, routes
     identity/      Persona REST client, identity service, webhook verification, bypass service

@@ -36,14 +36,16 @@ public class PersonaController {
     }
 
     /**
-     * Mirrors the verification decision the BFF obtained from Persona. Readable before approval by
-     * design: this is the call that grants (or revokes) access to the financial endpoints.
+     * Mirrors the verification decision the BFF obtained from Persona, and the sign-in profile it
+     * holds. Readable before approval by design: this is the call that grants (or revokes) access
+     * to the financial endpoints.
      */
     @PostMapping("/status")
     public MeResponse syncStatus(
             @CurrentUser(requireVerified = false) AppUser user,
             @Valid @RequestBody StatusSyncRequest request) {
-        return MeResponse.from(personaService.applyStatus(user, request.status(), request.inquiryId()));
+        return MeResponse.from(personaService.applyStatus(
+                user, request.status(), request.inquiryId(), request.email(), request.displayName()));
     }
 
     /** Demo-only. Mirrors the "DEV: Mark Verified" action described in the specification. */
@@ -53,7 +55,12 @@ public class PersonaController {
         return new DevVerifyResponse(PersonaStatus.APPROVED.name().toLowerCase(Locale.ROOT));
     }
 
-    public record StatusSyncRequest(@NotNull PersonaStatus status, @Size(max = 200) String inquiryId) {}
+    /** The decision plus the sign-in profile the BFF holds; profile fields are optional and never cleared. */
+    public record StatusSyncRequest(
+            @NotNull PersonaStatus status,
+            @Size(max = 200) String inquiryId,
+            @Size(max = 320) String email,
+            @Size(max = 200) String displayName) {}
 
     public record DevVerifyResponse(String personaStatus) {}
 }

@@ -224,3 +224,18 @@ paths bucket identically.
 It does **not** verify TimescaleDB itself: chunk sizing, the real continuous aggregate, refresh,
 and compression policies are only exercised against a live Tiger Data service. Check those with the
 queries above after pointing `DATABASE_URL` at one.
+
+## The `keel` schema (Express)
+
+Express shares the database and keeps its own tables in the `keel` schema, created idempotently
+at boot by `server/store/postgres.ts` (an advisory lock serialises concurrent boots). Flyway never
+sees these tables and `scripts/db.sh reset` drops them with the volume like everything else.
+
+| Table | Purpose |
+|---|---|
+| `keel.users` | One row per sign-in identity `(provider, provider_subject)`: profile columns plus `identity`, `onboarding`, and `workspace` as jsonb (the Nessie customer, account ids, merchants). Indexed on `identity->>'inquiryId'` for Persona webhooks. |
+| `keel.sessions` | `express-session` store (`connect-pg-simple` layout), pruned every 15 minutes. |
+| `keel.workspace_overlays` | Per-user dashboard state Nessie cannot hold: transaction edits, bill-review decisions, loan applications and saved offers. Whole-row write-through on every change. |
+
+Without `DATABASE_URL` Express falls back to in-memory maps and the default MemoryStore, mirroring
+the ledger's embedded-database fallback; both reset on restart.

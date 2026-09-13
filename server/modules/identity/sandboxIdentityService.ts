@@ -24,13 +24,16 @@ export class SandboxIdentityService implements IdentityService {
 
   async startSession(user: UserRecord): Promise<Omit<IdentitySessionResponse, 'nextStep'>> {
     let inquiryId = user.identity.inquiryId;
-    if (!inquiryId || user.identity.status === 'failed') {
+    let status = user.identity.status;
+    if (!inquiryId || status === 'failed') {
       inquiryId = `inq_sandbox_${randomBytes(8).toString('hex')}`;
-      await this.#users.update(user.id, (u) => {
+      // Read the status back from the repository: a database-backed store does not mutate `user` in place.
+      const updated = await this.#users.update(user.id, (u) => {
         u.identity = { mode: 'sandbox', status: 'pending', inquiryId, detail: null, updatedAt: new Date().toISOString() };
       });
+      status = updated.identity.status;
     }
-    return { mode: 'sandbox', status: user.identity.status, inquiryId, sessionToken: null };
+    return { mode: 'sandbox', status, inquiryId, sessionToken: null };
   }
 
   async complete(user: UserRecord): Promise<IdentityOutcome> {

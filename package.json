@@ -1,7 +1,7 @@
 {
   "name": "cashflow-onboarding",
   "version": "1.0.0",
-  "description": "Keel \u2014 sign-up, identity verification, onboarding, and the Cash Flow Copilot backend (ledger, documents, invoice risk, advisor) for small-business cash-flow management",
+  "description": "Keel — sign-up, identity verification, onboarding, and the Cash Flow Copilot backend (ledger, documents, invoice risk, advisor) for small-business cash-flow management",
   "scripts": {
     "dev": "concurrently -k -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "node --watch --env-file-if-exists=.env server/index.ts",
@@ -14,7 +14,7 @@
     "build": "vite build",
     "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.ts",
     "typecheck": "tsc -p tsconfig.server.json && tsc -p tsconfig.client.json",
-    "test": "node --test \"server/**/*.test.ts\" \"client/src/**/*.test.ts\" \"shared/**/*.test.ts\"",
+    "test": "node --env-file-if-exists=.env --test \"server/**/*.test.ts\" \"client/src/**/*.test.ts\" \"shared/**/*.test.ts\"",
     "test:ledger": "cd services/ledger-service && node ../../scripts/with-env.mjs ./mvnw -q test",
     "test:intelligence": "cd services/intelligence-service && .venv/bin/pytest -q",
     "test:all": "npm test && npm run test:intelligence && npm run test:ledger"
@@ -26,11 +26,13 @@
   "private": true,
   "dependencies": {
     "@elevenlabs/client": "^1.25.0",
+    "connect-pg-simple": "^10.0.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "google-auth-library": "^11.0.2",
     "lucide-react": "^1.45.0",
     "persona": "^5.8.0",
+    "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.3.1",
@@ -38,9 +40,11 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.19.0",
     "@types/node": "^24.13.4",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",

@@ -70,6 +70,25 @@ class PersonaStatusSyncTest {
     }
 
     @Test
+    void theSignInProfileIsStoredWithTheDecisionAndKeptWhenALaterSyncOmitsIt() throws Exception {
+        String subject = "google:persona-profile-user";
+        JsonNode anonymous = mapper.readTree(mvc.perform(as(subject, get("/v1/me")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(anonymous.get("email").isNull()).isTrue();
+
+        JsonNode approved = sync(subject,
+                "{\"status\":\"approved\",\"email\":\"owner@example.com\",\"displayName\":\"Jordan Rivera\"}");
+        assertThat(approved.get("email").asText()).isEqualTo("owner@example.com");
+        assertThat(approved.get("displayName").asText()).isEqualTo("Jordan Rivera");
+
+        // A status-only mirror (or blanks) must not erase what is known.
+        JsonNode declined = sync(subject, "{\"status\":\"declined\",\"email\":\"  \"}");
+        assertThat(declined.get("email").asText()).isEqualTo("owner@example.com");
+        assertThat(declined.get("displayName").asText()).isEqualTo("Jordan Rivera");
+        assertThat(declined.get("verified").asBoolean()).isFalse();
+    }
+
+    @Test
     void unknownStatusesAreRejected() throws Exception {
         mvc.perform(as("google:persona-bad-status", post("/v1/persona/status")
                         .contentType("application/json").content("{\"status\":\"maybe\"}")))
