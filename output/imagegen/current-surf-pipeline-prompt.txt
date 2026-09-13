@@ -1,0 +1,53 @@
+Use case: infographic-diagram.
+Create a polished, presentation-ready 16:9 landscape image, ideally 3840x2160, for a hackathon pitch deck about the existing product current.surf. This is a clear technical product pipeline graphic, not a screenshot. Very legible crisp typography, generous whitespace, premium financial software design. Warm off-white background, dark navy lettering, restrained teal accents, fine clean arrows, tasteful small line icons. No fake logos, no decorative illegible text, no watermark. All text must be spelled exactly as supplied. Maximize readability on a projected screen.
+
+Top left title: "current.surf"
+Large main heading: "From financial data to confident decisions"
+Smaller subtitle: "Cash-flow intelligence with local document AI"
+
+Below title, a slim full-width foundation bar with exact text: "React + TypeScript + Tailwind UI   →   Node.js + Express API"
+Small label underneath: "Sessions, identity checks and service orchestration"
+
+MAIN PIPELINE: Five evenly spaced cards across a single horizontal row, numbered 01–05, with clean right-facing connecting arrows. Each card uses a large clear stage title, simple relevant icon, and only the specified short lines. No extra arrows that could imply raw invoices are sent to Gemini.
+Card 01:
+"CONNECT"
+"Google sign-in • Persona identity"
+"Nessie bank data + invoice uploads"
+icon: bank and document.
+Card 02: highlight with soft pale teal fill, local-computer and small lock icon:
+"READ LOCALLY"
+"PyMuPDF + Tesseract OCR"
+"Ollama → validated invoice fields"
+Card 03:
+"CALCULATE & CHECK"
+"Java / Spring Boot: cash forecasts"
+"Python: rules + Isolation Forest"
+icon: calculator and small chart.
+Card 04:
+"EXPLAIN"
+"Gemini: advice from ledger context"
+"ElevenLabs: voice conversation"
+icon: chat waveform.
+Card 05:
+"ACT"
+"Review recommendations"
+"User-approved tasks"
+icon: checklist with confirmation check.
+
+Under cards 02 and 03, a clearly bounded local-processing/storage area using a thin teal bracket:
+Bold label: "Raw invoices and OCR text stay in the local processing environment"
+Secondary line: "Temporary document files are deleted after extraction"
+Below the connection into card 04 add a small outlined pill that says "Structured financial context to hosted AI" -- position so it clearly describes what goes toward Gemini, not raw document contents.
+
+Below main pipeline, two simple supporting horizontal modules:
+Module A, database cylinder icon:
+"PostgreSQL / TimescaleDB"
+"Bank balances • cash events • invoices • risk results • tasks"
+Module B, chart icon:
+"Workspace analytics"
+"TypeScript dashboard • scenario forecasts • spending insights"
+
+Bottom footer, medium readable text:
+"Calculated financial facts. AI explanations. Owner-controlled actions."
+
+Accuracy requirements: Gemini is hosted; do not place it within the local document privacy boundary. Local means backend processing environment, not necessarily the user's browser or device. OCR and Ollama are for invoice extraction; Isolation Forest is invoice anomaly detection, not the cash forecast model. Show user approval before task creation. This is a high-level product pipeline, do not imply all dashboard calculations run in Java. Do not claim all data stays local, fraud certainty, automated payments, or lender integrations. Keep diagram balanced with clean routing and no overlapping text.

@@ -1,0 +1,11 @@
+Current.surf helps small businesses see cash shortages early and decide what to do next.
+
+Our React and TypeScript frontend connects to an Express API, which handles Google sign-in, Persona identity verification, and Nessie banking data.
+
+For invoices, privacy starts with local AI. We extract text using PDF parsing and OCR, then run Ollama locally to turn it into validated invoice fields. Raw documents and OCR text stay in our processing environment, and temporary files are deleted.
+
+Our Java Spring Boot service stores financial records in PostgreSQL, with TimescaleDB support, and calculates cash-flow forecasts using precise decimal arithmetic. Python combines rules and Isolation Forest to flag unusual invoices.
+
+Gemini receives structured financial context to explain the numbers and suggest next steps. ElevenLabs brings that same advisor to voice.
+
+The owner reviews recommendations before adding tasks. We combine calculated financial facts, private document processing, and AI guidance—with the business owner in control.
