@@ -1,4 +1,5 @@
 import { CalendarDays, Check, Plus, TrendingUp, X } from 'lucide-react';
+import { Link } from 'react-router';
 import type { ProposedAction, TodoPriority } from '../../../../shared/copilot.ts';
 import { cn } from '../../lib/cn.ts';
 import { mediumDate, money } from '../../lib/format.ts';
@@ -72,6 +73,7 @@ export function RecommendationCard({ action, index, status, strings, language, o
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-positive-700">
             <Check className="size-4" aria-hidden="true" />
             {strings.added}
+            <Link to="/tasks" className="ml-2 text-brand-700 underline underline-offset-2">{language === 'es' ? 'Ver tareas' : 'View tasks'}</Link>
           </span>
         ) : (
           <>

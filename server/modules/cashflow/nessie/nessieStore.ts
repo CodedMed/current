@@ -44,6 +44,8 @@ interface CacheEntry {
 export interface NessieStoreHooks {
   /** Called with every fresh snapshot read from the bank, so other consumers (the ledger service) see the same data. */
   onSnapshot?: (user: UserRecord, snapshot: NessieSnapshot) => void;
+  /** After a bank write, refresh downstream forecasts before the caller can ask the advisor. */
+  onTransactionAdded?: (user: UserRecord) => Promise<void>;
 }
 
 /**
@@ -139,6 +141,8 @@ export class NessieCashflowStore implements CashflowStore {
     await this.#overlayStore.save(userId, overlays);
     const txn = buildManualTransaction(id, input);
     insertLedgerTransaction(ledger, account, txn);
+    const user = await this.#users.get(userId);
+    if (user) await this.#hooks.onTransactionAdded?.(user);
     return txn;
   }
 

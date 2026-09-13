@@ -83,14 +83,14 @@ export const FEATURES: readonly FeatureOption[] = [
   {
     id: 'invoices',
     label: 'Invoices',
-    description: 'Send, track, and chase invoices from one place.',
+    description: 'Upload vendor invoices, check unusual charges, and track due dates.',
     icon: 'file-text',
     recommendedFor: ['professional_services', 'consulting', 'construction', 'freelance'],
   },
   {
     id: 'vendor_payments',
     label: 'Vendor payments',
-    description: 'Schedule and approve payments to suppliers and subs.',
+    description: 'Track upcoming supplier payments and review unusual bills.',
     icon: 'truck',
     recommendedFor: ['retail', 'construction', 'restaurant', 'ecommerce'],
   },
@@ -117,8 +117,8 @@ export const FEATURES: readonly FeatureOption[] = [
   },
   {
     id: 'automation',
-    label: 'Automated financial workflows',
-    description: 'Reminders, sweeps, and approvals that run themselves.',
+    label: 'Financial tasks & recommendations',
+    description: 'Turn advisor recommendations into tasks you approve and track.',
     icon: 'workflow',
     recommendedFor: ['ecommerce', 'professional_services', 'consulting'],
   },

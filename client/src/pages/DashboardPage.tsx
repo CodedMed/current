@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { CashTransaction, CashflowDashboard, CashflowFilters, ForecastHorizon, ForecastScenario, ReviewDecision } from '../../../shared/types.ts';
 import { AccountsPanel } from '../components/cashflow/AccountsPanel.tsx';
+import { CopilotOverview } from '../components/copilot/CopilotOverview.tsx';
 import { AddTransactionDialog } from '../components/cashflow/AddTransactionDialog.tsx';
 import { BreakdownPanel } from '../components/cashflow/BreakdownPanel.tsx';
 import { CashPositionChart } from '../components/cashflow/CashPositionChart.tsx';
@@ -185,6 +186,7 @@ export default function DashboardPage() {
     setCompanyId(id);
     setAccountIds(null);
     setDrawerTxn(null);
+    setAddOpen(false);
   };
 
   const handleSignOut = async () => {
@@ -256,6 +258,10 @@ export default function DashboardPage() {
               <KpiStrip kpis={data.kpis} period={data.period} />
             </section>
 
+            <div className="mt-5">
+              <CopilotOverview version={version} />
+            </div>
+
             <div className="mt-5 grid gap-5 xl:grid-cols-3">
               <div className="grid min-w-0 xl:col-span-2">
                 <CashPositionChart
@@ -295,7 +301,7 @@ export default function DashboardPage() {
                 <ReviewPanel queue={data.reviews} onDecide={onDecide} onOpen={setDrawerTxn} />
               </div>
               <div className="grid min-w-0 xl:col-span-2">
-                <FinancingPanel companyId={companyId} version={version} onToast={setToast} />
+                <FinancingPanel key={companyId} companyId={companyId} version={version} onToast={setToast} />
               </div>
             </div>
 

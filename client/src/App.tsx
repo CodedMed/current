@@ -3,6 +3,8 @@ import { StepRoute } from './components/StepRoute.tsx';
 import { SessionProvider } from './lib/session.tsx';
 import AdvisorPage from './pages/AdvisorPage.tsx';
 import DashboardPage from './pages/DashboardPage.tsx';
+import DocumentsPage from './pages/DocumentsPage.tsx';
+import TasksPage from './pages/TasksPage.tsx';
 import SignUpPage from './pages/SignUpPage.tsx';
 import VerifyIdentityPage from './pages/VerifyIdentityPage.tsx';
 import BusinessTypePage from './pages/onboarding/BusinessTypePage.tsx';
@@ -70,6 +72,9 @@ export default function App() {
             </StepRoute>
           }
         />
+        <Route path="/documents" element={<StepRoute step="dashboard"><DocumentsPage /></StepRoute>} />
+        <Route path="/invoices" element={<Navigate to="/documents" replace />} />
+        <Route path="/tasks" element={<StepRoute step="dashboard"><TasksPage /></StepRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </SessionProvider>

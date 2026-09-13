@@ -45,8 +45,9 @@ public class CashFlowForecastCalculator {
         List<UUID> contributingEventIds = new ArrayList<>(relevant.size());
         BigDecimal expectedInflow = zero();
         BigDecimal expectedOutflow = zero();
-        Instant firstGapDate = null;
-        BigDecimal firstGapAmount = null;
+        // A deficit in the opening balance exists now, even if a later receipt covers it.
+        Instant firstGapDate = balance.signum() < 0 ? generatedAt : null;
+        BigDecimal firstGapAmount = balance.signum() < 0 ? balance.abs() : null;
 
         for (CashEvent event : relevant) {
             BigDecimal amount = scaled(event.amount());
@@ -69,7 +70,8 @@ public class CashFlowForecastCalculator {
             contributingEventIds.add(event.id());
 
             if (firstGapDate == null && balance.compareTo(BigDecimal.ZERO) < 0) {
-                firstGapDate = event.eventTime();
+                // Outstanding overdue bills affect today's projection, not a historic balance.
+                firstGapDate = event.eventTime().isBefore(generatedAt) ? generatedAt : event.eventTime();
                 firstGapAmount = balance.abs();
             }
         }

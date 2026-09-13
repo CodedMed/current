@@ -108,6 +108,13 @@ describe('CopilotIdentityBridge', () => {
     assert.deepEqual(fake.calls.seed, [true]);
   });
 
+  it('seeds only once when dashboard and forecast prepare a new user concurrently', async () => {
+    const bridge = new CopilotIdentityBridge(fake.ledger, config, { snapshot: source });
+    await Promise.all([bridge.prepare(user(true)), bridge.prepare(user(true)), bridge.prepare(user(true))]);
+    assert.deepEqual(fake.calls.seed, [false]);
+    assert.equal(fake.calls.push, 1);
+  });
+
   it('does not re-push an unchanged snapshot but does push a changed or forced one', async () => {
     const bridge = new CopilotIdentityBridge(fake.ledger, config, { snapshot: source });
     await bridge.prepare(user(true));
@@ -127,6 +134,25 @@ describe('CopilotIdentityBridge', () => {
     assert.equal(fake.calls.mirror, 2);
     assert.equal(fake.calls.push, 2);
     assert.deepEqual(fake.calls.seed, [false, false]);
+  });
+
+  it('a forced refresh waits for an older in-flight push and then reads the latest balance', async () => {
+    let releaseSnapshot!: (value: NessieSnapshot) => void;
+    const firstRead = new Promise<NessieSnapshot>((resolve) => { releaseSnapshot = resolve; });
+    const balances: number[] = [];
+    fake.ledger.pushBankSnapshot = async (_subject, payload) => {
+      balances.push(payload.accounts[0]!.balance);
+      return { insertedEvents: 0, updatedEvents: 1, syncedAt: '2026-09-12T00:00:00Z' };
+    };
+    const bridge = new CopilotIdentityBridge(fake.ledger, config, {
+      snapshot: async () => ++snapshotReads === 1 ? firstRead : snapshot(2500),
+    });
+    const initial = bridge.pushWorkspace(user(true));
+    const refresh = bridge.pushWorkspace(user(true), { force: true });
+    releaseSnapshot(snapshot(1000));
+    await Promise.all([initial, refresh]);
+    assert.equal(snapshotReads, 2);
+    assert.deepEqual(balances, [1000, 2500]);
   });
 
   it('keeps answering when the bank snapshot cannot be read', async () => {

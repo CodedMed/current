@@ -124,7 +124,7 @@ export function CashPositionChart({ position, showForecast, onShowForecast, onHo
     <section className="flex min-w-0 flex-col rounded-2xl bg-panel shadow-card ring-1 ring-ink/5" aria-label="Cash position">
       <header className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
         <div>
-          <h2 className="text-[15px] font-semibold text-ink">Cash position</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Bank activity forecast</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
             <span className="tabular font-semibold text-ink">{money(today.balance)}</span> today
             {showForecast && (
@@ -145,6 +145,8 @@ export function CashPositionChart({ position, showForecast, onShowForecast, onHo
           </ViewButton>
         </div>
       </header>
+
+      <p className="px-5 pt-2 text-xs text-ink-muted sm:px-6">Projects recurring bank activity. Uploaded invoices appear in Cash commitments above.</p>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 pt-4 sm:px-6">
         <Segmented

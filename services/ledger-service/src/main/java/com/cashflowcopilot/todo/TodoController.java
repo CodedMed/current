@@ -2,6 +2,8 @@ package com.cashflowcopilot.todo;
 
 import com.cashflowcopilot.auth.CurrentUser;
 import com.cashflowcopilot.user.AppUser;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -59,7 +61,8 @@ public class TodoController {
                 request.description(),
                 request.status(),
                 request.priority(),
-                request.dueDate()));
+                request.dueDate(),
+                request.hasDueDate()));
     }
 
     @DeleteMapping("/{id}")
@@ -78,13 +81,28 @@ public class TodoController {
             Map<String, Object> metadata
     ) {}
 
-    public record UpdateTodoRequest(
-            String title,
-            String description,
-            TodoStatus status,
-            TodoPriority priority,
-            LocalDate dueDate
-    ) {}
+    /** PATCH must distinguish an omitted due date from an explicit null (clear the date). */
+    public static final class UpdateTodoRequest {
+        @JsonProperty private String title;
+        @JsonProperty private String description;
+        @JsonProperty private TodoStatus status;
+        @JsonProperty private TodoPriority priority;
+        private LocalDate dueDate;
+        private boolean hasDueDate;
+
+        @JsonSetter("dueDate")
+        public void setDueDate(LocalDate dueDate) {
+            this.dueDate = dueDate;
+            this.hasDueDate = true;
+        }
+
+        public String title() { return title; }
+        public String description() { return description; }
+        public TodoStatus status() { return status; }
+        public TodoPriority priority() { return priority; }
+        public LocalDate dueDate() { return dueDate; }
+        public boolean hasDueDate() { return hasDueDate; }
+    }
 
     public record TodoDto(
             UUID id,

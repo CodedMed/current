@@ -150,22 +150,37 @@ export async function uploadCopilotDocument(file: File, onStage?: (stage: Docume
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let pending = '';
+  const receive = (line: string): SavedDocumentResult | null => {
+    if (!line.trim()) return null;
+    let event: DocumentUploadEvent;
+    try {
+      event = JSON.parse(line) as DocumentUploadEvent;
+    } catch {
+      throw new ApiError(0, 'interrupted', 'Upload status could not be read. Check your invoices before uploading again.');
+    }
+    if (event.stage === 'error') throw new ApiError(422, event.error.code, event.error.message);
+    if (event.stage === 'saved') {
+      onStage?.('saved');
+      return event.result;
+    }
+    onStage?.(event.stage);
+    return null;
+  };
   try {
     for (;;) {
       const { value, done } = await reader.read();
       pending += decoder.decode(value, { stream: !done });
       let newline: number;
       while ((newline = pending.indexOf('\n')) !== -1) {
-        const event = JSON.parse(pending.slice(0, newline)) as DocumentUploadEvent;
+        const result = receive(pending.slice(0, newline));
         pending = pending.slice(newline + 1);
-        if (event.stage === 'error') throw new ApiError(422, event.error.code, event.error.message);
-        if (event.stage === 'saved') {
-          onStage?.('saved');
-          return event.result;
-        }
-        onStage?.(event.stage);
+        if (result) return result;
       }
-      if (done) break;
+      if (done) {
+        const result = receive(pending);
+        if (result) return result;
+        break;
+      }
     }
   } finally {
     reader.releaseLock();

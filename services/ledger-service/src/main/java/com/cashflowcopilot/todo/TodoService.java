@@ -63,7 +63,8 @@ public class TodoService {
             String description,
             TodoStatus status,
             TodoPriority priority,
-            LocalDate dueDate) {
+            LocalDate dueDate,
+            boolean updateDueDate) {
 
         TodoItem existing = repository.findById(userId, id)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "Task not found."));
@@ -83,7 +84,7 @@ public class TodoService {
                 existing.source(),
                 nextStatus,
                 priority == null ? existing.priority() : priority,
-                dueDate == null ? existing.dueDate() : dueDate,
+                updateDueDate ? dueDate : existing.dueDate(),
                 existing.recommendationId(),
                 existing.metadata(),
                 existing.createdAt(),
@@ -105,6 +106,6 @@ public class TodoService {
 
     /** Anything the system proposes starts as a proposal awaiting approval. */
     private TodoStatus defaultStatusFor(TodoSource source) {
-        return source == TodoSource.MANUAL ? TodoStatus.APPROVED : TodoStatus.PROPOSED;
+        return source == null || source == TodoSource.MANUAL ? TodoStatus.APPROVED : TodoStatus.PROPOSED;
     }
 }

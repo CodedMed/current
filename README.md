@@ -86,6 +86,17 @@ Every vendor charge is compared with what that vendor usually bills (`server/mod
 
 `server/modules/cashflow/mock/lending.ts` underwrites the business from its own ledger: trailing 12-month revenue, cash buffer, net cash flow, revenue trend, customer concentration, and existing debt service produce a credit profile (tier A/B/C with a score and the factors behind it). A catalog of products from banks and fintechs (lines of credit, SBA 7(a), term loans, revenue-based advances, business cards, equipment financing) is then sized and priced from that profile: term loans are capped so debt service stays under 12% of revenue, revenue-based advances scale with processor volume, and card limits scale with card spend or cash on hand. One offer is recommended based on the situation (a line of credit to bridge a projected dip for a cash-burning company, an SBA loan for a profitable, growing one). The loan math lives in `shared/lending.ts` so the client can re-price an offer instantly when the amount changes, and each offer shows its effect on runway or on the lowest projected cash. Applications and saved offers are kept in the ledger; terms are illustrative.
 
+## Workspace pages
+
+The workspace navigation connects **Dashboard**, **Documents & invoices**, **Advisor**, and **Tasks**.
+
+- `/dashboard` includes **Cash commitments**, which reads the ledger's bank balances, uploaded invoice obligations, cash-gap forecast, invoice risks, and tasks. Its 30/60/90-day projection is separate from the bank-activity forecast, which projects recurring transactions.
+- `/documents` (also reachable through `/invoices`) uploads PDF/PNG/JPEG vendor invoices, shows processing stages and extracted fields, and lists invoice statuses, risk scores, and reasons. Risk checks can be retried from the table.
+- `/tasks` creates manual tasks, edits details and due dates, and supports proposal approval, decline, progress, completion, and deletion. Advisor recommendation cards link to this task list after saving.
+- The dashboard's **Financing** section offers amount and cost estimates, saved sample offers, and simulated applications. It does not submit a real lender application.
+
+See [MVP UI audit and verification](docs/mvp-ui-audit.md) for the functional review and test coverage.
+
 ## Cash Flow Copilot backend
 
 The product loop **verify → ingest → normalize → forecast/detect → advise → act** lives in two services that Express fronts under `/api/copilot/*`. The browser never talks to them; Express adds the caller's stable subject and a shared internal token to every call, and both services reject anything without that token.

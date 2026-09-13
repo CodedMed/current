@@ -207,7 +207,7 @@ export default function AdvisorPage() {
       <AdvisorHeader user={user} strings={strings} mode={mode} language={language} health={health} onMode={changeMode} onLanguage={changeLanguage} onSignOut={() => void handleSignOut()} />
 
       <main className="mx-auto grid max-w-[1400px] gap-5 px-5 py-5 sm:px-8 sm:py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <section aria-label={strings.title} className="flex min-h-[calc(100dvh-8.5rem)] flex-col overflow-hidden rounded-2xl bg-panel shadow-card ring-1 ring-ink/5 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)]">
+        <section aria-label={strings.title} className="flex min-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-2xl bg-panel shadow-card ring-1 ring-ink/5 lg:sticky lg:top-[7.5rem] lg:max-h-[calc(100dvh-9rem)]">
           <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6" role="log" aria-live="polite" aria-relevant="additions">
             {messages.length === 0 ? (
               <EmptyState strings={strings} suggestions={suggestions} onPick={(q) => send(q)} />

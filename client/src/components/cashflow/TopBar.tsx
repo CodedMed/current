@@ -7,6 +7,7 @@ import { Badge } from '../ui/Badge.tsx';
 import { Button, buttonClasses } from '../ui/Button.tsx';
 import { Logo } from '../ui/Logo.tsx';
 import { Dropdown } from './Dropdown.tsx';
+import { WorkspaceNav } from '../layout/WorkspaceNav.tsx';
 
 export const SECTIONS = [
   { id: 'overview', label: 'Dashboard' },
@@ -14,6 +15,7 @@ export const SECTIONS = [
   { id: 'forecast', label: 'Forecast' },
   { id: 'accounts', label: 'Accounts' },
   { id: 'reports', label: 'Reports' },
+  { id: 'financing', label: 'Financing' },
 ] as const;
 
 export type SectionId = (typeof SECTIONS)[number]['id'];
@@ -117,6 +119,7 @@ export function TopBar(props: TopBarProps) {
         </div>
       </div>
 
+      <WorkspaceNav />
       <nav className="mx-auto max-w-[1400px] px-5 sm:px-8" aria-label="Dashboard sections">
         <ul className="-mb-px flex gap-1 overflow-x-auto">
           {SECTIONS.map((s) => {

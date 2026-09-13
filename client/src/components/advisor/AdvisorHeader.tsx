@@ -8,6 +8,7 @@ import { Segmented } from '../cashflow/Segmented.tsx';
 import { Badge } from '../ui/Badge.tsx';
 import { buttonClasses } from '../ui/Button.tsx';
 import { Logo } from '../ui/Logo.tsx';
+import { WorkspaceNav } from '../layout/WorkspaceNav.tsx';
 
 export type AdvisorMode = 'text' | 'voice';
 
@@ -41,7 +42,7 @@ export function AdvisorHeader({ user, strings, mode, language, health, onMode, o
             </Badge>
           )}
           {voice && (
-            <Badge tone={voice === 'elevenlabs' ? 'success' : 'neutral'} className="hidden md:inline-flex" title={voice === 'elevenlabs' ? 'ElevenLabs voice is configured' : 'Set ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID to enable voice'}>
+            <Badge tone={voice === 'elevenlabs' ? 'success' : 'neutral'} className="hidden md:inline-flex" title={voice === 'elevenlabs' ? 'Voice conversations are available' : 'Voice is unavailable. You can still ask questions in text.'}>
               <AudioLines className="size-3" aria-hidden="true" />
               {voice === 'elevenlabs' ? 'Voice' : 'Voice off'}
             </Badge>
@@ -72,7 +73,7 @@ export function AdvisorHeader({ user, strings, mode, language, health, onMode, o
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <Link to="/dashboard" className={buttonClasses('secondary', 'sm')}>
             <LayoutDashboard className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{strings.dashboard}</span>
+              <span className="sr-only sm:not-sr-only">{strings.dashboard}</span>
           </Link>
           {user && (
             <button
@@ -91,6 +92,7 @@ export function AdvisorHeader({ user, strings, mode, language, health, onMode, o
             </button>
           )}
         </div>
+        <WorkspaceNav className="order-last w-full" />
       </div>
     </header>
   );

@@ -75,6 +75,7 @@ class InvoiceIngestionTest {
         UUID id = UUID.fromString(read(post("/v1/invoices").contentType("application/json").content(stale)).get("id").asText());
         CashEvent event = events.findBySourceRecord(user, CashEventSource.DOCUMENT, id.toString()).orElseThrow();
         assertThat(event.status()).isEqualTo(CashEventStatus.OVERDUE);
+        assertThat(read(get("/v1/invoices/" + id)).get("status").asText()).isEqualTo("OVERDUE");
         // Overdue money still comes out of the projection.
         JsonNode after = read(get("/v1/forecast"));
         assertThat(after.get("expectedOutflow").decimalValue().subtract(before.get("expectedOutflow").decimalValue()))

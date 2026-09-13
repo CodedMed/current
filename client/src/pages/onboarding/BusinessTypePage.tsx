@@ -63,7 +63,7 @@ export default function BusinessTypePage() {
       description="We use this to shape your categories, forecasts, and the example books we set up for you."
       footer={
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-ink-muted">You can refine this later in settings.</span>
+          <span className="text-xs text-ink-muted">This shapes the sample books in your workspace.</span>
           <Button size="lg" onClick={() => void submit()} loading={saving} iconRight={<ArrowRight className="size-4" aria-hidden="true" />}>
             Continue
           </Button>

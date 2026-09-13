@@ -35,17 +35,18 @@ public class InvoiceService {
     @Transactional
     public Invoice create(UUID userId, CreateInvoiceRequest request) {
         Instant now = Instant.now();
+        // Invoice views and the forecast must agree about whether the obligation is overdue.
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate eventDate = request.dueDate() != null ? request.dueDate() : today;
+        CashEventStatus status = eventDate.isBefore(today) ? CashEventStatus.OVERDUE : CashEventStatus.EXPECTED;
         Invoice invoice = new Invoice(UUID.randomUUID(), userId, request.vendorKey(),
                 request.vendorDisplayName(), request.invoiceNumberHash(), request.amount(), request.previousAmount(),
-                request.invoiceDate(), request.dueDate(), null, "EXPECTED", request.recurring(),
+                request.invoiceDate(), request.dueDate(), null, status.name(), request.recurring(),
                 request.paymentDestinationFingerprint(), "DOCUMENT", request.confidence(), now);
         invoiceRepository.insert(invoice);
         // An undated obligation enters today's forecast, without inventing a due date on the invoice.
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        LocalDate eventDate = request.dueDate() != null ? request.dueDate() : today;
         // A due date already behind us is an overdue obligation, not a future one: it still
         // reduces the forecast, and it belongs in the overdue views rather than the upcoming ones.
-        CashEventStatus status = eventDate.isBefore(today) ? CashEventStatus.OVERDUE : CashEventStatus.EXPECTED;
         cashEventRepository.insert(new CashEvent(UUID.randomUUID(), userId,
                 eventDate.atStartOfDay(ZoneOffset.UTC).toInstant(), request.amount(), Direction.OUT,
                 request.category(), CashEventSource.DOCUMENT, invoice.id().toString(),

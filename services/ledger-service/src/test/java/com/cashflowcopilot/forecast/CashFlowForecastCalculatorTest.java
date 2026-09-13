@@ -88,6 +88,23 @@ class CashFlowForecastCalculatorTest {
     }
 
     @Test
+    void anOpeningDeficitIsReportedNowEvenWhenLaterIncomeCoversIt() {
+        for (List<CashEvent> events : List.of(List.<CashEvent>of(), List.of(event(2, "1000", Direction.IN)))) {
+            CashFlowForecast forecast = calculator.calculate(money("-300"), events, HORIZON_DAYS, NOW);
+            assertThat(forecast.firstGapDate()).isEqualTo(NOW);
+            assertThat(forecast.firstGapAmount()).isEqualByComparingTo("300");
+        }
+    }
+
+    @Test
+    void anOutstandingPastDueBillCreatesAGapToday() {
+        CashFlowForecast forecast = calculator.calculate(
+                money("1000"), List.of(event(-12, "1400", Direction.OUT)), HORIZON_DAYS, NOW);
+        assertThat(forecast.firstGapDate()).isEqualTo(NOW);
+        assertThat(forecast.firstGapAmount()).isEqualByComparingTo("400");
+    }
+
+    @Test
     void cancelledEventsAreIgnored() {
         CashEvent cancelled = new CashEvent(
                 UUID.randomUUID(),

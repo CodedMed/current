@@ -41,6 +41,7 @@ export class CopilotIdentityBridge {
   /** The ledger's user id per subject; a change means the ledger's database was reset. */
   readonly #ledgerUserIds = new Map<string, string>();
   readonly #seeded = new Set<string>();
+  readonly #seeding = new Map<string, Promise<void>>();
   /** Fingerprint of the last snapshot pushed per subject. */
   readonly #pushed = new Map<string, string>();
   readonly #pushFailedAt = new Map<string, number>();
@@ -109,7 +110,13 @@ export class CopilotIdentityBridge {
     if (!user.workspace || !this.#snapshot) return null;
     const subject = this.subjectFor(user);
     const inflight = this.#pushing.get(subject);
-    if (inflight) return inflight;
+    if (inflight) {
+      if (!options.force) return inflight;
+      // A refresh after a bank mutation must not reuse a snapshot read before the mutation.
+      // Finish that push first, then read and push the latest bank state.
+      await inflight.catch(() => {});
+      return this.pushWorkspace(user, options);
+    }
     const run = (async () => {
       await this.#ensureMirrored(user);
       const snapshot = options.snapshot ?? (await this.#snapshot!(user));
@@ -161,18 +168,26 @@ export class CopilotIdentityBridge {
       }
     }
     if (this.#config.copilot.demoMode && this.ledgerStatusFor(user) === 'approved' && !this.#seeded.has(subject)) {
-      try {
-        const result = await this.#ledger.seedDemo(subject, !usesWorkspace);
-        if (result.seeded) log.info('Seeded demo data', { subject, bankData: !usesWorkspace, invoices: result.invoices, todos: result.todos });
-      } catch (err) {
-        // The ledger may run with DEMO_MODE=false while Express does not; that is not fatal.
-        if (err instanceof UpstreamError && err.status === 501) {
-          log.warn('Ledger service refused demo seeding (DEMO_MODE is off there).', { subject });
-        } else {
-          throw err;
-        }
+      // Dashboard and forecast load together. Share the seed so both requests cannot
+      // observe an empty invoice history and insert the same demo invoices twice.
+      let seeding = this.#seeding.get(subject);
+      if (!seeding) {
+        seeding = (async () => {
+          try {
+            const result = await this.#ledger.seedDemo(subject, !usesWorkspace);
+            if (result.seeded) log.info('Seeded demo data', { subject, bankData: !usesWorkspace, invoices: result.invoices, todos: result.todos });
+          } catch (err) {
+            if (err instanceof UpstreamError && err.status === 501) {
+              log.warn('Ledger service refused demo seeding (DEMO_MODE is off there).', { subject });
+            } else {
+              throw err;
+            }
+          }
+          this.#seeded.add(subject);
+        })().finally(() => this.#seeding.delete(subject));
+        this.#seeding.set(subject, seeding);
       }
-      this.#seeded.add(subject);
+      await seeding;
     }
   }
 

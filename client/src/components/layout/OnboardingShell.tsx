@@ -33,7 +33,7 @@ const RAIL_COPY: Record<FlowStep, { heading: string; body: string }> = {
   },
   features: {
     heading: 'Start with what keeps you up at night.',
-    body: 'Pick the areas you want a firm grip on first. You can switch on the rest whenever you are ready.',
+    body: 'Pick the areas you want a firm grip on first. We use your priorities to shape the sample workspace.',
   },
   setup: {
     heading: 'Your books, assembled.',

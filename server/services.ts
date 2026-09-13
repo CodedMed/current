@@ -89,6 +89,18 @@ export async function createServices(config: AppConfig): Promise<Services> {
               log.warn('Bank snapshot could not be pushed to the ledger service', { userId: user.id, message: err instanceof Error ? err.message : String(err) });
             });
           },
+          onTransactionAdded: async (user) => {
+            try {
+              await copilot.identity.pushWorkspace(user, { force: true });
+            } catch (err) {
+              // The transaction is already saved at the bank. A downstream outage must not make
+              // the UI report a failed save and invite the owner to submit the same payment twice.
+              log.warn('Saved bank transaction could not be pushed to the ledger service', {
+                userId: user.id,
+                message: err instanceof Error ? err.message : String(err),
+              });
+            }
+          },
         });
   return {
     config: effectiveConfig,
