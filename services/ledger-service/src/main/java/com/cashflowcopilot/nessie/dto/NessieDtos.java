@@ -18,6 +18,7 @@ public final class NessieDtos {
             BigDecimal balance
     ) {}
 
+    /** {@code merchantName} is resolved by whoever fetched the purchase; null when unknown. */
     public record NessiePurchaseDto(
             String id,
             String accountId,
@@ -25,10 +26,20 @@ public final class NessieDtos {
             BigDecimal amount,
             String status,
             String description,
-            String category
+            String category,
+            String merchantName
     ) {}
 
     public record NessieDepositDto(
+            String id,
+            String accountId,
+            Instant transactionDate,
+            BigDecimal amount,
+            String status,
+            String description
+    ) {}
+
+    public record NessieWithdrawalDto(
             String id,
             String accountId,
             Instant transactionDate,

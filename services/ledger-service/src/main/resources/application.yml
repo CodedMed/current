@@ -5,6 +5,9 @@ spring:
     enabled: true
     # Migrations are copied into the jar from the monorepo root db/migrations at build time.
     locations: classpath:db/migration
+    # Portable migrations continue from V2 while the Tiger Data stream already sits at V1001+;
+    # Flyway must be allowed to apply the lower-numbered file on a database that has the higher ones.
+    out-of-order: true
   jackson:
     default-property-inclusion: always
     serialization:

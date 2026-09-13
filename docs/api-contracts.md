@@ -39,11 +39,11 @@ Shapes are defined once in `shared/copilot.ts` and exposed to the client through
 
 | Method | Path | Calls |
 | --- | --- | --- |
-| GET | `/api/copilot/health` | `GET /health` on both services; reports the active adapters |
+| GET | `/api/copilot/health` | `GET /health` on both services; reports the active adapters and each process's `service` name. `ok` is false when the process on the URL is not the expected service (another app on the port). |
 | GET | `/api/copilot/me` | ledger `POST /v1/persona/status` (mirror) then the ledger's view of the user |
 | GET | `/api/copilot/dashboard?horizonDays=` | ledger `GET /v1/dashboard` |
 | GET | `/api/copilot/forecast?horizonDays=` | ledger `GET /v1/forecast` |
-| POST | `/api/copilot/nessie/sync` | ledger `POST /v1/nessie/sync` (with the live workspace's customer id when Express's Nessie is live) |
+| POST | `/api/copilot/nessie/sync` | With a workspace: re-reads its Nessie snapshot and pushes it (ledger `POST /v1/bank/snapshot`). Without one: ledger `POST /v1/nessie/sync` (the demo customer from the fixture). |
 | GET | `/api/copilot/accounts/summary` | ledger `GET /v1/accounts/summary` |
 | GET | `/api/copilot/cash-events?from=&to=` | ledger `GET /v1/cash-events` |
 | POST | `/api/copilot/cash-events/manual` | ledger `POST /v1/cash-events/manual` |
@@ -55,6 +55,13 @@ Shapes are defined once in `shared/copilot.ts` and exposed to the client through
 | POST | `/api/copilot/voice/message` | Same body as `/advisor`, called by the browser's ElevenLabs client tool: ledger `GET /v1/advisor/context` → intelligence `POST /v1/voice/message` |
 | GET · POST | `/api/copilot/todos` | ledger `/v1/todos` |
 | PATCH · DELETE | `/api/copilot/todos/:id` | ledger `/v1/todos/{id}` |
+
+Before any of these routes reaches the ledger, Express mirrors the Persona decision, pushes the
+user's workspace bank snapshot once per process (re-pushed whenever the dashboard reads a changed
+snapshot from Nessie), and in demo mode seeds what is still missing: the whole fixture business
+for a user without a workspace, only the vendor invoice history for one with. If the ledger no
+longer knows the user (it restarted without a database), all three steps are redone
+automatically.
 
 The advisor context is always fetched server-side. A browser cannot choose the facts the model
 reasons over. `history` is at most 12 prior turns of `{ role: "user" | "advisor", content }`, used for
@@ -87,9 +94,10 @@ Persona routes additionally requires `persona_status = 'approved'`.
 | POST | `/v1/persona/dev/verify` | Demo only. Marks the caller approved. Refused when `DEMO_MODE=false`. |
 | POST | `/v1/persona/inquiry` | `NOT_IMPLEMENTED`: inquiries are created by the BFF. |
 | POST | `/webhooks/persona` | Public, inert (`501`). Persona webhooks are handled by Express at `/api/identity/webhook`. |
-| POST | `/v1/demo/seed` | Demo only. Seeds the demo business for the caller if they have no data. Returns `{ seeded, bankEvents, ledgerEvents, invoices, todos }`. |
-| POST | `/v1/nessie/sync` | Idempotent ingest. Optional body `{ "customerId": "…" }`; the id is remembered for later syncs. Returns `{ insertedEvents, updatedEvents, syncedAt }`. |
-| GET | `/v1/accounts/summary` | Balances straight from the bank adapter. |
+| POST | `/v1/demo/seed` | Demo only, idempotent per part. Optional body `{ "includeBankData": false }` seeds only the vendor invoice history (for a user whose bank data is their own workspace); the default seeds the fixture bank feed, receivables, obligations, invoices and tasks. Returns `{ seeded, bankEvents, ledgerEvents, invoices, todos }`. |
+| POST | `/v1/bank/snapshot` | The BFF pushes the Nessie records it holds for the user's workspace (see below). The ledger normalises them, upserts by record id, stores the balances and records the sync. Returns `{ insertedEvents, updatedEvents, syncedAt }`. |
+| POST | `/v1/nessie/sync` | Pull-path ingest through the ledger's own Nessie client. Optional body `{ "customerId": "…" }`; the id is remembered for later syncs. The demo customer is always read from the fixture, whatever key is configured. Returns `{ insertedEvents, updatedEvents, syncedAt }`. |
+| GET | `/v1/accounts/summary` | Balances from the last ingested snapshot (`bank_accounts`); zero until something was ingested. Cards are negative (amount owed). |
 | GET | `/v1/cash-events?from=&to=` | Defaults to −30/+60 days. |
 | POST | `/v1/cash-events/manual` | Manual entry. |
 | GET | `/v1/invoices` · `/v1/invoices/{id}` | Invoices with their latest risk result. Includes `paymentDestinationFingerprint` (a hash) for the risk engine. |
@@ -100,6 +108,32 @@ Persona routes additionally requires `persona_status = 'approved'`.
 | GET | `/v1/advisor/context?horizonDays=60` | Allowlisted facts for the reasoning layer. |
 | GET · POST | `/v1/todos` | |
 | PATCH · DELETE | `/v1/todos/{id}` | Enforces the status transitions (`PROPOSED → APPROVED/DECLINED → IN_PROGRESS → COMPLETED`). |
+
+### `POST /v1/bank/snapshot`
+
+The workspace as the BFF fetched it from Nessie, with merchant names resolved. Calendar dates;
+card balances positive (the amount owed), which the ledger signs so `totalBalance` matches the
+Keel dashboard's total cash.
+
+```json
+{
+  "customerId": "68c4…",
+  "accounts": [ { "id": "acc-op", "type": "Checking", "nickname": "Operating", "balance": 9000.00 } ],
+  "deposits": [ { "id": "dep-1", "accountId": "acc-op", "date": "2026-09-09", "status": "completed", "amount": 6000.00, "description": "Client payment · Acme" } ],
+  "withdrawals": [ { "id": "wd-1", "accountId": "acc-op", "date": "2026-09-07", "status": "completed", "amount": 5400.00, "description": "Payroll · Gusto" } ],
+  "purchases": [ { "id": "pur-1", "accountId": "acc-card", "date": "2026-09-10", "status": "completed", "amount": 320.00, "description": "Weekly produce", "merchantName": "Sysco", "merchantCategory": "Food & Beverage" } ],
+  "bills": [ { "id": "bill-1", "accountId": "acc-op", "payee": "Harbor Property Group", "nickname": "Office rent", "paymentDate": "2026-10-01", "status": "recurring", "amount": 2200.00, "recurring": true } ]
+}
+```
+
+Normalisation: settled deposits, withdrawals and purchases become `ACTUAL`; a `pending` deposit
+is an open receivable (`EXPECTED`, `OVERDUE` once its date passes, counterparty read from
+"Invoice REF · Customer · net N"); a `pending` purchase is `EXPECTED`; `cancelled` records are
+`CANCELLED`; a one-off bill whose date passed is `OVERDUE`, a recurring one rolls to its next
+occurrence; deposits and withdrawals whose description starts with `Transfer · ` are internal
+moves and are skipped. When the customer id differs from the one previously ingested, every event
+that came from the old feed (or was seeded next to it) is dropped first; document-derived events
+and manual entries are kept.
 
 ### `GET /v1/forecast`
 

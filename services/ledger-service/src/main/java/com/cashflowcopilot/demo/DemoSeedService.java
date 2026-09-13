@@ -42,9 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
  * feed, so the product tells a complete story with no sponsor credentials.
  *
  * <p>Only runs while {@code DEMO_MODE=true}. At startup it seeds the built-in demo subject; the
- * BFF can also seed any other verified user through {@code POST /v1/demo/seed}, which is how a
- * freshly signed-in demo user gets the same business. Seeding is idempotent: a user who already
- * has data is left untouched.
+ * BFF can also seed any other verified user through {@code POST /v1/demo/seed}. A user whose bank
+ * data comes from their own workspace gets only the vendor invoice history (so an uploaded
+ * invoice still has a baseline to be compared against), never the fixture's bank feed,
+ * receivables or tasks. Each part is idempotent: what already exists is left untouched.
  */
 @Component
 public class DemoSeedService implements ApplicationRunner {
@@ -86,7 +87,7 @@ public class DemoSeedService implements ApplicationRunner {
             return;
         }
         AppUser user = userService.findOrCreateBySubject(properties.demoAuthSubject());
-        SeedResult result = seedIfEmpty(user);
+        SeedResult result = seedIfEmpty(user, true);
         if (result.seeded()) {
             log.info("Demo seed for {}: {} bank events, {} ledger events, {} invoices, {} tasks",
                     properties.demoAuthSubject(), result.bankEvents(), result.ledgerEvents(),
@@ -94,12 +95,19 @@ public class DemoSeedService implements ApplicationRunner {
         }
     }
 
-    /**
-     * Seeds the demo business for {@code user} unless they already have ledger data. Refused
-     * outside demo mode so no fixture can ever land in a real ledger.
-     */
+    /** Full demo business: bank feed, receivables, obligations, invoice history, tasks. */
     @Transactional
     public SeedResult seedIfEmpty(AppUser user) {
+        return seedIfEmpty(user, true);
+    }
+
+    /**
+     * Seeds the demo business for {@code user}. With {@code includeBankData=false} only the vendor
+     * invoice history is added, and only when the user has no invoices yet. Refused outside demo
+     * mode so no fixture can ever land in a real ledger.
+     */
+    @Transactional
+    public SeedResult seedIfEmpty(AppUser user, boolean includeBankData) {
         if (!properties.demoMode()) {
             throw new ApiException(ErrorCode.NOT_IMPLEMENTED, "Demo seeding is disabled outside demo mode.");
         }
@@ -109,27 +117,38 @@ public class DemoSeedService implements ApplicationRunner {
         int todos = 0;
         boolean seededLedger = false;
 
-        if (cashEventService.countForUser(user.id()) == 0) {
+        if (includeBankData && cashEventService.countForUser(user.id()) == 0) {
             try {
-                NessieSyncService.SyncResult sync = nessieSyncService.sync(user);
+                NessieSyncService.SyncResult sync =
+                        nessieSyncService.sync(user, properties.nessie().demoCustomerId());
                 bankEvents = sync.insertedEvents();
             } catch (ApiException e) {
-                // A live client pointed at a customer the sandbox does not have must not stop the
-                // demo business from existing; bank data can still be synced later.
+                // The fixture business must exist even if the bank feed cannot be read right now.
                 log.warn("Demo seed: bank sync skipped ({}).", e.getMessage());
             }
-            LedgerCounts counts = seedLedger(user);
-            ledgerEvents = counts.events();
-            invoices = counts.invoices();
+            ledgerEvents = seedLedgerEvents(user);
             seededLedger = true;
+        } else if (includeBankData) {
+            try {
+                if (nessieSyncService.backfillDemoBalancesIfMissing(user)) {
+                    log.info("Demo seed: stored bank balances for {} from the fixture feed", user.id());
+                }
+            } catch (ApiException e) {
+                log.warn("Demo seed: balance backfill skipped ({}).", e.getMessage());
+            }
         }
-        if (todoService.countForUser(user.id()) == 0) {
+        if (invoiceRepository.countForUser(user.id()) == 0) {
+            InvoiceCounts counts = seedInvoices(user, includeBankData);
+            invoices = counts.invoices();
+            ledgerEvents += counts.events();
+        }
+        if (includeBankData && todoService.countForUser(user.id()) == 0) {
             todos = seedTodos(user);
         }
-        return new SeedResult(seededLedger || todos > 0, bankEvents, ledgerEvents, invoices, todos);
+        return new SeedResult(seededLedger || invoices > 0 || todos > 0, bankEvents, ledgerEvents, invoices, todos);
     }
 
-    private LedgerCounts seedLedger(AppUser user) {
+    private int seedLedgerEvents(AppUser user) {
         JsonNode fixture = readFixture();
         int events = 0;
 
@@ -166,9 +185,14 @@ public class DemoSeedService implements ApplicationRunner {
             cashEventService.upsertBySourceRecord(event);
             events++;
         }
+        return events;
+    }
 
+    /** The vendor history the risk engine compares uploads against; obligations only with the full business. */
+    private InvoiceCounts seedInvoices(AppUser user, boolean withCashEvents) {
         int invoices = 0;
-        for (JsonNode node : fixture.withArray("vendorInvoices")) {
+        int events = 0;
+        for (JsonNode node : readFixture().withArray("vendorInvoices")) {
             Invoice invoice = new Invoice(
                     UUID.randomUUID(),
                     user.id(),
@@ -189,7 +213,7 @@ public class DemoSeedService implements ApplicationRunner {
             invoiceRepository.insert(invoice);
             invoices++;
 
-            if (node.path("createsCashEvent").asBoolean(false)) {
+            if (withCashEvents && node.path("createsCashEvent").asBoolean(false)) {
                 Map<String, Object> metadata = new HashMap<>();
                 metadata.put("invoiceId", invoice.id().toString());
                 metadata.put("counterpartyLabel", invoice.vendorDisplayName());
@@ -209,7 +233,7 @@ public class DemoSeedService implements ApplicationRunner {
                 events++;
             }
         }
-        return new LedgerCounts(events, invoices);
+        return new InvoiceCounts(invoices, events);
     }
 
     private int seedTodos(AppUser user) {
@@ -250,8 +274,8 @@ public class DemoSeedService implements ApplicationRunner {
         return node.hasNonNull(field) ? today().plusDays(node.path(field).asInt()) : null;
     }
 
-    private record LedgerCounts(int events, int invoices) {}
+    private record InvoiceCounts(int invoices, int events) {}
 
-    /** What a seed call did. {@code seeded} is false when the user already had data. */
+    /** What a seed call did. {@code seeded} is false when the user already had everything. */
     public record SeedResult(boolean seeded, int bankEvents, int ledgerEvents, int invoices, int todos) {}
 }

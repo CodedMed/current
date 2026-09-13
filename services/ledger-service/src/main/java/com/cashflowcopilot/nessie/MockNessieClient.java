@@ -4,6 +4,7 @@ import com.cashflowcopilot.nessie.dto.NessieDtos.NessieAccountDto;
 import com.cashflowcopilot.nessie.dto.NessieDtos.NessieBillDto;
 import com.cashflowcopilot.nessie.dto.NessieDtos.NessieDepositDto;
 import com.cashflowcopilot.nessie.dto.NessieDtos.NessiePurchaseDto;
+import com.cashflowcopilot.nessie.dto.NessieDtos.NessieWithdrawalDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -68,7 +69,8 @@ public class MockNessieClient implements NessieClient {
                     node.path("amount").decimalValue(),
                     node.path("status").asText(),
                     node.path("description").asText(),
-                    node.path("category").asText(null)));
+                    node.path("category").asText(null),
+                    node.path("merchantName").asText(null)));
         }
         return purchases;
     }
@@ -89,6 +91,27 @@ public class MockNessieClient implements NessieClient {
                     node.path("description").asText()));
         }
         return deposits;
+    }
+
+    @Override
+    public List<NessieWithdrawalDto> getWithdrawals(String accountId) {
+        List<NessieWithdrawalDto> withdrawals = new ArrayList<>();
+        if (!fixture.has("withdrawals")) {
+            return withdrawals;
+        }
+        for (JsonNode node : fixture.withArray("withdrawals")) {
+            if (!matchesAccount(node, accountId)) {
+                continue;
+            }
+            withdrawals.add(new NessieWithdrawalDto(
+                    node.path("id").asText(),
+                    node.path("accountId").asText(),
+                    resolveDate(node),
+                    node.path("amount").decimalValue(),
+                    node.path("status").asText(),
+                    node.path("description").asText()));
+        }
+        return withdrawals;
     }
 
     @Override

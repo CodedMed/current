@@ -100,6 +100,12 @@ public class CashEventService {
                 metadata == null ? Map.of() : metadata);
     }
 
+    /** Removes the previous bank feed's events (and anything seeded alongside it). */
+    @Transactional
+    public int deleteIngested(UUID userId) {
+        return repository.deleteIngested(userId);
+    }
+
     public int countForUser(UUID userId) {
         return repository.countForUser(userId);
     }

@@ -6,12 +6,13 @@ import type { AuthProvider } from './modules/auth/types.ts';
 import { MockCashflowStore } from './modules/cashflow/mock/store.ts';
 import { createCopilotServices, type CopilotServices } from './modules/copilot/index.ts';
 import { NessieCashflowStore } from './modules/cashflow/nessie/nessieStore.ts';
+import { createLogger } from './lib/logger.ts';
 import type { CashflowStore } from './modules/cashflow/store.ts';
 import { BypassIdentityService } from './modules/identity/bypassIdentityService.ts';
 import { PersonaIdentityService } from './modules/identity/personaService.ts';
 import { SandboxIdentityService } from './modules/identity/sandboxIdentityService.ts';
 import type { IdentityService } from './modules/identity/types.ts';
-import { createNessieApi } from './modules/nessie/index.ts';
+import { createNessieApi, fetchSnapshot } from './modules/nessie/index.ts';
 import { Provisioner } from './modules/nessie/provisioner.ts';
 import type { NessieApi } from './modules/nessie/types.ts';
 import { createPersistence } from './store/persistence.ts';
@@ -23,6 +24,8 @@ import type { UserRepository } from './store/userStore.ts';
  * Flip this to `true` only to skip KYC while developing the dashboard.
  */
 const IDENTITY_BYPASS = false;
+
+const log = createLogger('services');
 
 /**
  * Composition root. Every integration is chosen here based on which
@@ -66,9 +69,27 @@ export async function createServices(config: AppConfig): Promise<Services> {
 
   const nessie = createNessieApi(config);
   const provisioner = new Provisioner(nessie, users);
+  // The ledger service holds the same bank data the dashboard shows: the copilot bridge reads a
+  // user's workspace snapshot on demand, and every snapshot the dashboard fetches is pushed too.
+  const copilot = createCopilotServices(effectiveConfig, {
+    snapshot:
+      config.cashflowSource === 'nessie'
+        ? async (user) => {
+            if (!user.workspace) throw new Error('The user has no workspace to read.');
+            return fetchSnapshot(nessie, user.workspace);
+          }
+        : null,
+  });
   const cashflow: CashflowStore =
-    config.cashflowSource === 'mock' ? new MockCashflowStore() : new NessieCashflowStore(nessie, users, store.overlays);
-  const copilot = createCopilotServices(effectiveConfig);
+    config.cashflowSource === 'mock'
+      ? new MockCashflowStore()
+      : new NessieCashflowStore(nessie, users, store.overlays, {
+          onSnapshot: (user, snapshot) => {
+            copilot.identity.pushWorkspace(user, { snapshot }).catch((err: unknown) => {
+              log.warn('Bank snapshot could not be pushed to the ledger service', { userId: user.id, message: err instanceof Error ? err.message : String(err) });
+            });
+          },
+        });
   return {
     config: effectiveConfig,
     persistence: store.mode,

@@ -19,7 +19,7 @@ import { createLogger } from '../../lib/logger.ts';
 import type { CopilotIdentityBridge } from './identityBridge.ts';
 import type { HistoricalInvoice, IntelligenceClient } from './intelligenceClient.ts';
 import type { LedgerClient, LedgerInvoice } from './ledgerClient.ts';
-import { UpstreamError } from './upstream.ts';
+import { EXPECTED_SERVICE_NAMES, UpstreamError } from './upstream.ts';
 
 const log = createLogger('copilot');
 
@@ -183,19 +183,38 @@ export function createCopilotRouter({ config, ledger, intelligence, identity }: 
   /** Liveness of both services and which adapters back them; readable before verification. */
   router.get('/health', requireUser, async (_req, res) => {
     const [ledgerHealth, intelligenceHealth] = await Promise.allSettled([ledger.health(), intelligence.health()]);
+    // A process that answers but is not ours (another project on the same port) is not "ok".
+    const wrongApp = (url: string, service: string | undefined, expected: string) =>
+      `A different application ("${service ?? 'unknown'}") answers at ${url}; expected ${expected}. Point the service URL at the right port.`;
+    const ledgerService = ledgerHealth.status === 'fulfilled' ? (ledgerHealth.value.service ?? null) : null;
+    const intelligenceService = intelligenceHealth.status === 'fulfilled' ? (intelligenceHealth.value.service ?? null) : null;
+    const ledgerOk = ledgerHealth.status === 'fulfilled' && ledgerService === EXPECTED_SERVICE_NAMES.ledger;
+    const intelligenceOk = intelligenceHealth.status === 'fulfilled' && intelligenceService === EXPECTED_SERVICE_NAMES.intelligence;
     const body: CopilotHealth = {
       ledger: {
-        ok: ledgerHealth.status === 'fulfilled',
-        demoMode: ledgerHealth.status === 'fulfilled' ? ledgerHealth.value.demoMode : null,
+        ok: ledgerOk,
+        service: ledgerService,
+        demoMode: ledgerOk ? ledgerHealth.value.demoMode : null,
         url: ledger.baseUrl,
-        error: ledgerHealth.status === 'rejected' ? String(ledgerHealth.reason?.message ?? ledgerHealth.reason) : null,
+        error:
+          ledgerHealth.status === 'rejected'
+            ? String(ledgerHealth.reason?.message ?? ledgerHealth.reason)
+            : ledgerOk
+              ? null
+              : wrongApp(ledger.baseUrl, ledgerService ?? undefined, EXPECTED_SERVICE_NAMES.ledger),
       },
       intelligence: {
-        ok: intelligenceHealth.status === 'fulfilled',
-        demoMode: intelligenceHealth.status === 'fulfilled' ? intelligenceHealth.value.demoMode : null,
+        ok: intelligenceOk,
+        service: intelligenceService,
+        demoMode: intelligenceOk ? intelligenceHealth.value.demoMode : null,
         url: intelligence.baseUrl,
-        error: intelligenceHealth.status === 'rejected' ? String(intelligenceHealth.reason?.message ?? intelligenceHealth.reason) : null,
-        adapters: intelligenceHealth.status === 'fulfilled' ? intelligenceHealth.value.adapters : null,
+        error:
+          intelligenceHealth.status === 'rejected'
+            ? String(intelligenceHealth.reason?.message ?? intelligenceHealth.reason)
+            : intelligenceOk
+              ? null
+              : wrongApp(intelligence.baseUrl, intelligenceService ?? undefined, EXPECTED_SERVICE_NAMES.intelligence),
+        adapters: intelligenceOk ? intelligenceHealth.value.adapters : null,
       },
     };
     res.set('Cache-Control', 'no-store');
@@ -219,11 +238,14 @@ export function createCopilotRouter({ config, ledger, intelligence, identity }: 
 
   /* ── bank data ── */
 
+  /**
+   * Re-syncs bank data. A user with a workspace gets its current snapshot pushed to the ledger
+   * (live or sandbox alike); without one the ledger pulls the demo customer from its fixture.
+   */
   router.post('/nessie/sync', async (_req, res) => {
     const user = currentUser(res);
-    // Only a live workspace has a customer the ledger's live client can read; the sandbox ids are local.
-    const customerId = user.workspace?.mode === 'live' ? user.workspace.nessieCustomerId : undefined;
-    res.json(await ledger.syncNessie(subjectOf(res), customerId));
+    const pushed = await identity.pushWorkspace(user, { force: true });
+    res.json(pushed ?? (await ledger.syncNessie(subjectOf(res))));
   });
 
   router.get('/accounts/summary', async (_req, res) => {

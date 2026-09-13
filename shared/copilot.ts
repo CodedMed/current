@@ -352,9 +352,11 @@ export interface UpdateTodoInput {
 /* ───────────────────────── Health ───────────────────────── */
 
 export interface CopilotHealth {
-  ledger: { ok: boolean; demoMode: boolean | null; url: string; error: string | null };
+  /** `service` is the name the process at `url` reports; `ok` is false when it is not the expected one. */
+  ledger: { ok: boolean; service: string | null; demoMode: boolean | null; url: string; error: string | null };
   intelligence: {
     ok: boolean;
+    service: string | null;
     demoMode: boolean | null;
     url: string;
     error: string | null;

@@ -17,6 +17,7 @@ import type {
   UpdateTodoInput,
 } from '../../../shared/copilot.ts';
 import type { CopilotConfig } from '../../config.ts';
+import type { BankSnapshotPush } from './bankSnapshot.ts';
 import { callUpstream, type UpstreamRequest } from './upstream.ts';
 
 export interface LedgerHealth {
@@ -89,15 +90,23 @@ export class LedgerClient {
     });
   }
 
-  /** Demo mode only: gives a verified user the seeded demo business, once. */
-  seedDemo(subject: string): Promise<DemoSeedResult> {
-    return this.#call(subject, { method: 'POST', path: '/v1/demo/seed', timeoutMs: 60_000 });
+  /**
+   * Demo mode only, idempotent. With `includeBankData` the user gets the whole fixture business;
+   * without it only the vendor invoice history, for a user whose bank data is their own workspace.
+   */
+  seedDemo(subject: string, includeBankData = true): Promise<DemoSeedResult> {
+    return this.#call(subject, { method: 'POST', path: '/v1/demo/seed', json: { includeBankData }, timeoutMs: 60_000 });
   }
 
   /* ── bank data ── */
 
   syncNessie(subject: string, customerId?: string): Promise<NessieSyncResult> {
     return this.#call(subject, { method: 'POST', path: '/v1/nessie/sync', json: customerId ? { customerId } : {}, timeoutMs: 60_000 });
+  }
+
+  /** Hands the ledger the workspace's bank records; it normalises them and stores the balances. */
+  pushBankSnapshot(subject: string, snapshot: BankSnapshotPush): Promise<NessieSyncResult> {
+    return this.#call(subject, { method: 'POST', path: '/v1/bank/snapshot', json: snapshot, timeoutMs: 60_000 });
   }
 
   accountsSummary(subject: string): Promise<AccountsSummary> {

@@ -128,6 +128,21 @@ public class CashEventRepository {
         insert(event);
     }
 
+    /**
+     * Drops everything that came from a bank feed or was seeded next to one, identified by a source
+     * record id. Document-derived events and manual entries without one are kept.
+     */
+    public int deleteIngested(UUID userId) {
+        return jdbcClient.sql("""
+                        DELETE FROM cash_events
+                         WHERE user_id = ?
+                           AND source IN ('NESSIE', 'MANUAL', 'SYSTEM')
+                           AND source_record_id IS NOT NULL
+                        """)
+                .param(userId)
+                .update();
+    }
+
     public int countForUser(UUID userId) {
         return jdbcClient.sql("SELECT COUNT(*) FROM cash_events WHERE user_id = ?")
                 .param(userId)

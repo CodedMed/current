@@ -97,7 +97,7 @@ Browser ──► Express /api/copilot/* ──► services/ledger-service      
 
 | Capability | Where | Without credentials |
 |---|---|---|
-| Bank data → `cash_events` | Java `NessieClient` (`POST /v1/nessie/sync`) | `MockNessieClient` serves `samples/seed/nessie_mock.json` |
+| Bank data → `cash_events` | Express pushes the user's Nessie workspace snapshot (`POST /v1/bank/snapshot`); Java normalises it and stores the balances. `POST /v1/nessie/sync` pulls through Java's own `NessieClient` for standalone use | The in-memory Nessie workspace is pushed the same way; a user without a workspace gets `samples/seed/nessie_mock.json` |
 | Deterministic forecast and first cash gap | Java `CashFlowForecastCalculator`, `BigDecimal` only | — (no credentials involved) |
 | Private invoice extraction | Python: PyMuPDF → Tesseract → Ollama → strict Pydantic schema; temp files deleted | Deterministic sample values, labelled in `warnings` |
 | Invoice anomaly detection | Python rules + Isolation Forest (from 10 historical invoices); stored by Java | — |
@@ -134,12 +134,12 @@ The same `DATABASE_URL` serves both halves of the app, with a schema per owner:
 
 | Schema | Owner | Holds | Without `DATABASE_URL` |
 |---|---|---|---|
-| `public.*` | Java ledger, via Flyway (`db/migrations`, `db/timescale`) | `app_users` (subject, email, display name, Persona status), `cash_events` hypertable, `invoices`, `invoice_risks`, `todo_items`, `nessie_sync_state`, `cash_daily` aggregate | throwaway embedded PostgreSQL |
+| `public.*` | Java ledger, via Flyway (`db/migrations`, `db/timescale`) | `app_users` (subject, email, display name, Persona status), `cash_events` hypertable, `bank_accounts` (last ingested balances), `invoices`, `invoice_risks`, `todo_items`, `nessie_sync_state`, `cash_daily` aggregate | throwaway embedded PostgreSQL |
 | `keel.*` | Express, idempotent DDL at boot (`server/store/postgres.ts`) | `users` (sign-in profile, identity decision, onboarding choices, Nessie workspace), `sessions`, `workspace_overlays` (category/note edits, review decisions, financing) | in-memory maps + MemoryStore |
 
 Both keep the user keyed by the auth subject (`google:<sub>`), so a returning Google sign-in finds its rows on either side. Express forwards the email and display name with each Persona decision (`POST /v1/persona/status`), so the ledger's `app_users` row is never anonymous. The sandbox Google provider deliberately mints a new subject per sign-in so onboarding can be replayed; returning-user behaviour needs real `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. `SESSION_SECRET` must be set for sessions to outlive an API restart.
 
-Adding a key is what switches a capability from mock to real; there is no other flag. `NESSIE_API_KEY` for live bank data in the ledger (in any `DEMO_MODE`; the BFF passes the customer it provisioned), `OLLAMA_MODEL` (after `ollama pull llama3.2`, see [docs/local-ai.md](docs/local-ai.md)) for real extraction, `GEMINI_API_KEY` for the advisor, `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` for voice. Keep `INTERNAL_SERVICE_TOKEN` identical everywhere; the `npm run dev:*` scripts load the repo `.env` for the services so that happens by itself.
+Adding a key is what switches a capability from mock to real; there is no other flag. `NESSIE_API_KEY` for live bank data (Express provisions the workspace and pushes its snapshot to the ledger, so both show the same business), `OLLAMA_MODEL` (after `ollama pull llama3.2`, see [docs/local-ai.md](docs/local-ai.md)) for real extraction, `GEMINI_API_KEY` for the advisor, `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` for voice. Keep `INTERNAL_SERVICE_TOKEN` identical everywhere; the `npm run dev:*` scripts load the repo `.env` for the services so that happens by itself. If port 8000 is taken on your machine, set `INTELLIGENCE_SERVICE_PORT` and `INTELLIGENCE_SERVICE_URL` together; the API checks both services at startup and warns when a different application answers on a configured URL, and `GET /api/copilot/health` reports the same.
 
 ### Demo walkthrough
 
@@ -155,9 +155,9 @@ The full route table, request and response shapes, and the service-level contrac
 ### Tests
 
 ```bash
-npm test                     # 25 tests: BFF advisor contract (context always from the ledger, no automatic tasks), voice state machine, recommendation → task mapping
-npm run test:ledger          # 35 tests: forecast calculator, Nessie normalisation, Persona guard and mirroring, invoice ingestion and risk persistence, demo seeding, task transitions, advisor context
-npm run test:intelligence    # 112 tests: extraction schemas and privacy, OCR cleanup, rules, features, Isolation Forest, advisor schemas, demo advisor, Gemini adapter and fallback, voice contracts
+npm test                     # 37 tests: BFF advisor contract (context always from the ledger, no automatic tasks), bank-snapshot mapping, identity bridge (push once, seed right, recover from a ledger restart), voice state machine, recommendation → task mapping
+npm run test:ledger          # 66 tests: forecast calculator, Nessie normalisation (statuses, receivables, withdrawals, recurring bills), bank snapshot ingest, Persona guard and mirroring, invoice ingestion and risk persistence, demo seeding, task transitions, advisor context
+npm run test:intelligence    # 116 tests: extraction schemas and privacy, OCR cleanup, rules, features, Isolation Forest, advisor schemas, demo advisor, Gemini adapter and fallback, voice contracts
 npm run typecheck
 ```
 

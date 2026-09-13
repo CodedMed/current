@@ -45,9 +45,12 @@ user is therefore gated twice, by two processes, from one server-derived decisio
 The subject forwarded to the services is `<provider>:<provider subject>` (for example
 `google:1043…`), which is stable across restarts of the in-memory user store.
 
-In demo mode (`DEMO_MODE=true`, the development default) the bridge also calls
-`POST /v1/demo/seed` the first time a verified user appears, so every sandbox sign-in walks the
-whole narrative on the seeded demo business. The ledger refuses that call outside demo mode.
+The bridge also keeps the ledger's bank data in step (see *One bank snapshot* below) and, in demo
+mode (`DEMO_MODE=true`, the development default), calls `POST /v1/demo/seed` the first time a
+verified user appears: the whole fixture business for a user without a workspace, only the vendor
+invoice history for a user whose bank data is their own workspace. The ledger refuses that call
+outside demo mode. If the ledger has lost the user (a restart without a database), the bridge
+notices on the next request and redoes the mirror, the push and the seed.
 
 ## Data model
 
@@ -75,8 +78,9 @@ reports the **first** moment the running balance crosses below zero — not the 
 deficit. A later inflow never erases that date, which is the entire point: knowing you are short
 on the 14th matters even if a client pays on the 20th.
 
-Available cash comes from the bank adapter rather than from replaying ledger history, so the
-projection starts from what is actually in the account.
+Available cash is the signed sum of the balances last ingested from the bank (`bank_accounts`),
+not a replay of ledger history and not a live call, so the projection starts from what is in the
+account and a bank outage cannot turn it into $0 mid-request.
 
 ## Documents and risk
 
@@ -150,10 +154,15 @@ Recommendations are proposals. The advisor cannot write to the ledger; a proposa
 only when the owner presses **Add to tasks**, which creates an `ADVISOR` task with status
 `APPROVED` through `POST /v1/todos`.
 
-## Two Nessie views
+## One bank snapshot
 
 Express provisions a Nessie workspace per user during onboarding and reads it for the Keel
-dashboard; the ledger service syncs Nessie into `cash_events` for the forecast. When Express's
-Nessie integration is live, `POST /api/copilot/nessie/sync` passes the provisioned customer id to
-the ledger so both read the same customer. In sandbox mode each side uses its own fixture, since
-the in-memory ids mean nothing to the live API.
+dashboard. The ledger service holds the same records: the copilot bridge pushes the workspace's
+snapshot to `POST /v1/bank/snapshot` before the first financial call, and every fresh snapshot the
+dashboard reads from Nessie is pushed again when it changed. The ledger normalises the records
+(`NessieNormalizer`), upserts them by the bank's record ids and stores the balances, so the
+advisor's figures and the dashboard's figures come from one feed, live or sandbox alike.
+
+The ledger's own `NessieClient` remains for the pull path (`POST /v1/nessie/sync`, standalone
+deployments). The demo customer in `samples/seed/nessie_mock.json` is always served from the
+fixture, even with a live key, because it does not exist at the real API.

@@ -10,6 +10,9 @@ import { createLogger } from '../../lib/logger.ts';
 
 export type UpstreamService = 'ledger' | 'intelligence';
 
+/** What each service calls itself in `GET /health`; anything else on the port is another application. */
+export const EXPECTED_SERVICE_NAMES: Record<UpstreamService, string> = { ledger: 'ledger-service', intelligence: 'intelligence-service' };
+
 const log = createLogger('copilot');
 
 /** A well-formed error the service returned; status and code pass straight through. */

@@ -1,6 +1,7 @@
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createLogger } from './lib/logger.ts';
+import { checkCopilotServices } from './modules/copilot/index.ts';
 import { createServices } from './services.ts';
 
 const log = createLogger('server');
@@ -22,6 +23,7 @@ const server = app.listen(config.port, () => {
   log.info(`  Copilot AI      ${config.copilot.intelligenceUrl} (Python)${config.copilot.demoMode ? ' · DEMO_MODE' : ''}`);
   if (!config.isProduction) log.info(`  App URL         ${config.appUrl}`);
   for (const note of services.config.notes) log.warn(note);
+  void checkCopilotServices(services.copilot, log);
 });
 
 const shutdown = (signal: string) => {

@@ -13,9 +13,9 @@ import type {
 } from '../../../../shared/types.ts';
 import { isoDate, startOfToday } from '../../../lib/dates.ts';
 import { forbidden, notFound } from '../../../lib/errors.ts';
-import type { UserRepository } from '../../../store/userStore.ts';
+import type { UserRecord, UserRepository } from '../../../store/userStore.ts';
 import { fetchSnapshot } from '../../nessie/snapshot.ts';
-import type { NessieApi } from '../../nessie/types.ts';
+import type { NessieApi, NessieSnapshot } from '../../nessie/types.ts';
 import { buildDashboard } from '../mock/analytics.ts';
 import type { Ledger } from '../mock/ledger.ts';
 import {
@@ -41,6 +41,11 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
+export interface NessieStoreHooks {
+  /** Called with every fresh snapshot read from the bank, so other consumers (the ledger service) see the same data. */
+  onSnapshot?: (user: UserRecord, snapshot: NessieSnapshot) => void;
+}
+
 /**
  * Cash-flow store backed by the Nessie banking API. Each user's workspace is
  * one company. Reads come from Nessie; manual entries are written through to
@@ -56,11 +61,13 @@ export class NessieCashflowStore implements CashflowStore {
   readonly #cache = new Map<string, CacheEntry>();
   /** Overlays loaded once per user per process; every change is written through. */
   readonly #overlays = new Map<string, WorkspaceOverlays>();
+  readonly #hooks: NessieStoreHooks;
 
-  constructor(api: NessieApi, users: UserRepository, overlays: OverlayRepository) {
+  constructor(api: NessieApi, users: UserRepository, overlays: OverlayRepository, hooks: NessieStoreHooks = {}) {
     this.#api = api;
     this.#users = users;
     this.#overlayStore = overlays;
+    this.#hooks = hooks;
   }
 
   async companies(userId: string): Promise<CashflowCompany[]> {
@@ -193,6 +200,7 @@ export class NessieCashflowStore implements CashflowStore {
 
     const overlays = await this.#overlaysFor(userId);
     const snapshot = await fetchSnapshot(this.#api, workspace);
+    this.#hooks.onSnapshot?.(user, snapshot);
     const ledger = ledgerFromSnapshot({
       snapshot,
       workspace,
